@@ -19,8 +19,12 @@
     const p = new URLSearchParams(location.search);
     const fx = document.createElement('halftone-fx');
 
+    // Aliases included (bg/background, dot/dotcolor/dot-color) so hand-written
+    // URLs can't silently miss.
     const ATTRS = {
-      src: 'src', type: 'type', grid: 'grid', dot: 'dot-color', bg: 'background',
+      src: 'src', type: 'type', grid: 'grid',
+      dot: 'dot-color', dotcolor: 'dot-color', 'dot-color': 'dot-color',
+      bg: 'background', background: 'background',
       brightness: 'brightness', contrast: 'contrast', gamma: 'gamma', dither: 'dither',
     };
     for (const [param, attr] of Object.entries(ATTRS)) {

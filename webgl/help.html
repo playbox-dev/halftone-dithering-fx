@@ -164,6 +164,11 @@
   <h2 id="faq">FAQ</h2>
   <p><strong>The animation doesn't show inside the STUDIO editor.</strong><br>
      Expected — embeds render in preview and on the published site, not on the editor canvas.</p>
+  <p><strong><code>bg=transparent</code> looks white when I open the embed URL directly.</strong><br>
+     Expected — a standalone browser tab has nothing behind the page, so you see the
+     browser's own default backdrop. The transparency is real: put the iframe on a page
+     (or in STUDIO) and the page shows through between the dots. Both <code>bg</code> and
+     <code>background</code> work as the param name.</p>
   <p><strong>The video doesn't autoplay.</strong><br>
      Keep <code>allow="autoplay"</code> on the iframe. Playback is muted + inline, which all
      browsers permit.</p>
