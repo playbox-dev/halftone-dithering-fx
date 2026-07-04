@@ -26,6 +26,10 @@
       inset: 0;
       z-index: 0;
     }
+    /* Checkerboard shows through when the background is transparent */
+    .hero.checker {
+      background: repeating-conic-gradient(#1a1a1a 0% 25%, #2e2e2e 0% 50%) 50% / 28px 28px;
+    }
     /* Control panel */
     .panel {
       position: fixed;
@@ -115,6 +119,11 @@
     <input type="color" id="bgColor" value="#ffffff">
 
     <div class="row-check">
+      <input type="checkbox" id="transparentBg">
+      <label for="transparentBg">Transparent background (dots over your page)</label>
+    </div>
+
+    <div class="row-check">
       <input type="checkbox" id="multicolor">
       <label for="multicolor">Multicolor dots</label>
     </div>
@@ -145,6 +154,13 @@
 
     document.getElementById('multicolor').addEventListener('change', e => {
       e.target.checked ? fx.setAttribute('multicolor', '') : fx.removeAttribute('multicolor');
+    });
+
+    const bgColorInput = document.getElementById('bgColor');
+    document.getElementById('transparentBg').addEventListener('change', e => {
+      bgColorInput.disabled = e.target.checked;
+      fx.setAttribute('background', e.target.checked ? 'transparent' : bgColorInput.value);
+      document.querySelector('.hero').classList.toggle('checker', e.target.checked);
     });
 
     // Track what's playing so Export iframe can reference it by URL.
@@ -196,7 +212,8 @@
       const vals = {
         grid: document.getElementById('grid').value,
         dot: document.getElementById('dotColor').value.slice(1),
-        bg: document.getElementById('bgColor').value.slice(1),
+        bg: document.getElementById('transparentBg').checked
+          ? 'transparent' : document.getElementById('bgColor').value.slice(1),
         brightness: document.getElementById('brightness').value,
         contrast: document.getElementById('contrast').value,
         gamma: document.getElementById('gamma').value,
