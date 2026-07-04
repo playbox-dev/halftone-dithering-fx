@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>bench</title></head><body>
+<div id="host" style="position:fixed;top:0;left:0;width:1920px;height:1080px"></div>
+<script src="./halftone-fx.js"></script>
+<script>
+// Head-to-head: original CPU halftone vs <halftone-fx> WebGL, same source,
+// same 1920x1080 output, same grid. Reports ms/frame for each.
+const W = 1920, H = 1080, GRID = 12;
+
+// Faithful copy of the original script.js hot path (dither/smoothing off).
+function cpuFrame(video, canvas, tmp) {
+  const ctx = tmp.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(video, 0, 0, W, H);
+  const data = ctx.getImageData(0, 0, W, H).data;
+  const gray = new Float32Array(W * H);
+  for (let i = 0; i < data.length; i += 4) {
+    let g = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    g = Math.max(0, Math.min(255, g));
+    g = 255 * Math.pow(g / 255, 1);
+    gray[i / 4] = g;
+  }
+  const cols = Math.ceil(W / GRID), rows = Math.ceil(H / GRID);
+  const cells = new Float32Array(cols * rows);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    let s = 0, n = 0;
+    const y0 = r * GRID, x0 = c * GRID;
+    const y1 = Math.min(y0 + GRID, H), x1 = Math.min(x0 + GRID, W);
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { s += gray[y * W + x]; n++; }
+    cells[r * cols + c] = s / n;
+  }
+  const octx = canvas.getContext('2d');
+  octx.fillStyle = '#fff'; octx.fillRect(0, 0, W, H);
+  octx.fillStyle = '#000';
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const v = cells[r * cols + c] / 255, rad = GRID / 2 * (1 - v);
+    if (rad > 0.5) {
+      octx.beginPath();
+      octx.arc(c * GRID + GRID / 2, r * GRID + GRID / 2, rad, 0, Math.PI * 2);
+      octx.fill();
+    }
+  }
+}
+
+(async () => {
+  const video = document.createElement('video');
+  video.muted = true; video.loop = true; video.playsInline = true;
+  video.src = './assets/horse.mp4';
+  await new Promise(res => video.addEventListener('loadeddata', res, { once: true }));
+  await video.play();
+  await new Promise(r => setTimeout(r, 300));
+
+  // --- CPU version ---
+  const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H;
+  const tmp = document.createElement('canvas'); tmp.width = W; tmp.height = H;
+  cpuFrame(video, canvas, tmp); // warmup / JIT
+  cpuFrame(video, canvas, tmp);
+  const N_CPU = 40;
+  let t0 = performance.now();
+  for (let i = 0; i < N_CPU; i++) cpuFrame(video, canvas, tmp);
+  const cpuMs = (performance.now() - t0) / N_CPU;
+
+  // --- WebGL version ---
+  const fx = document.createElement('halftone-fx');
+  fx.setAttribute('grid', String(GRID));
+  fx.style.width = W + 'px'; fx.style.height = H + 'px';
+  document.getElementById('host').appendChild(fx);
+  fx.source = video;
+  await new Promise(r => setTimeout(r, 400));
+  const gl = fx._gl;
+  const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+  const renderer = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  fx.pause(); // stop its own rAF loop; we drive frames manually
+  await new Promise(r => setTimeout(r, 100));
+  fx._render(0); gl.finish(); // warmup
+
+  const N_GL = 300;
+  // JS/main-thread cost: what actually blocks the page.
+  t0 = performance.now();
+  for (let i = 0; i < N_GL; i++) fx._render(i / 60);
+  const glJsMs = (performance.now() - t0) / N_GL;
+  // Upper bound including full GPU sync every frame (pessimistic: real
+  // rendering pipelines, never syncs like this).
+  t0 = performance.now();
+  for (let i = 0; i < N_GL; i++) { fx._render(i / 60); gl.finish(); }
+  const glTotalMs = (performance.now() - t0) / N_GL;
+
+  window.__results = {
+    output: W + 'x' + H, grid: GRID, renderer,
+    cpuMsPerFrame: +cpuMs.toFixed(2),
+    cpuMaxFps: +(1000 / cpuMs).toFixed(1),
+    webglMainThreadMsPerFrame: +glJsMs.toFixed(3),
+    webglSyncedMsPerFrame: +glTotalMs.toFixed(3),
+    speedupMainThread: +(cpuMs / glJsMs).toFixed(1),
+    speedupFullySynced: +(cpuMs / glTotalMs).toFixed(1),
+  };
+  document.title = 'done';
+})().catch(e => { window.__results = { error: String(e) }; });
+</script></body></html>
