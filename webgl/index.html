@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>halftone-fx — GPU halftone for websites</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', 'Helvetica', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0d0d0d;
+      color: #eee;
+    }
+
+    /* The whole point: <halftone-fx> as a live hero background */
+    .hero {
+      position: relative;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hero halftone-fx {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+    }
+    .hero-copy {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      pointer-events: none;
+      mix-blend-mode: difference;
+      color: #fff;
+    }
+    .hero-copy h1 {
+      font-size: clamp(2.5rem, 8vw, 6rem);
+      letter-spacing: -0.03em;
+      margin: 0;
+    }
+    .hero-copy p { font-size: clamp(1rem, 2vw, 1.25rem); opacity: 0.85; }
+
+    /* Control panel */
+    .panel {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      z-index: 10;
+      background: rgba(20, 20, 20, 0.85);
+      backdrop-filter: blur(10px);
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 8px 12px;
+      align-items: center;
+      font-size: 12px;
+      width: min(340px, calc(100vw - 32px));
+    }
+    .panel label { color: #999; }
+    .panel input[type="range"] { width: 100%; accent-color: #fff; }
+    .panel output { min-width: 34px; text-align: right; color: #ccc; font-variant-numeric: tabular-nums; }
+    .panel select, .panel input[type="color"] {
+      grid-column: 2 / 4;
+      background: #1a1a1a; color: #eee; border: 1px solid #333;
+      border-radius: 6px; padding: 4px 6px; width: 100%; height: 28px;
+    }
+    .panel .row-check { grid-column: 1 / 4; display: flex; gap: 8px; align-items: center; color: #999; }
+    .panel .upload { grid-column: 1 / 4; }
+    .panel .upload input { display: none; }
+    .panel .upload span {
+      display: block; text-align: center; padding: 8px;
+      border: 1px dashed #444; border-radius: 6px; color: #888; cursor: pointer;
+    }
+    .panel .upload span:hover { border-color: #888; color: #ccc; }
+  </style>
+</head>
+<body>
+
+  <section class="hero">
+    <halftone-fx id="fx"
+      src="https://i.imgur.com/5PrJCc2.mp4"
+      grid="14"
+      brightness="20"
+      dot-color="#000000"
+      background="#ffffff"></halftone-fx>
+    <div class="hero-copy">
+      <h1>HALFTONE&nbsp;FX</h1>
+      <p>live GPU dithering &middot; two draw calls &middot; zero CPU pixel work</p>
+    </div>
+  </section>
+
+  <div class="panel">
+    <label for="grid">Grid</label>
+    <input type="range" id="grid" min="4" max="40" value="14">
+    <output id="gridOut">14</output>
+
+    <label for="brightness">Bright</label>
+    <input type="range" id="brightness" min="-100" max="100" value="20">
+    <output id="brightnessOut">20</output>
+
+    <label for="contrast">Contrast</label>
+    <input type="range" id="contrast" min="-100" max="100" value="0">
+    <output id="contrastOut">0</output>
+
+    <label for="gamma">Gamma</label>
+    <input type="range" id="gamma" min="0.1" max="3" step="0.1" value="1">
+    <output id="gammaOut">1</output>
+
+    <label for="dither">Dither</label>
+    <select id="dither">
+      <option value="none" selected>None</option>
+      <option value="bayer">Ordered (Bayer)</option>
+      <option value="noise">Noise (animated)</option>
+    </select>
+
+    <label for="dotColor">Dots</label>
+    <input type="color" id="dotColor" value="#000000">
+
+    <label for="bgColor">Background</label>
+    <input type="color" id="bgColor" value="#ffffff">
+
+    <div class="row-check">
+      <input type="checkbox" id="multicolor">
+      <label for="multicolor">Multicolor dots</label>
+    </div>
+
+    <label class="upload">
+      <input type="file" id="fileUpload" accept="image/*,video/*">
+      <span>📁 Drop in your own image / video</span>
+    </label>
+  </div>
+
+  <script src="./halftone-fx.js"></script>
+  <script>
+    const fx = document.getElementById('fx');
+    const bind = (id, attr) => {
+      const el = document.getElementById(id);
+      const out = document.getElementById(id + 'Out');
+      el.addEventListener('input', () => {
+        fx.setAttribute(attr, el.value);
+        if (out) out.textContent = el.value;
+      });
+    };
+    bind('grid', 'grid');
+    bind('brightness', 'brightness');
+    bind('contrast', 'contrast');
+    bind('gamma', 'gamma');
+    bind('dither', 'dither');
+    bind('dotColor', 'dot-color');
+    bind('bgColor', 'background');
+
+    document.getElementById('multicolor').addEventListener('change', e => {
+      e.target.checked ? fx.setAttribute('multicolor', '') : fx.removeAttribute('multicolor');
+    });
+
+    document.getElementById('fileUpload').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      if (file.type.startsWith('video/')) fx.setAttribute('type', 'video');
+      else fx.removeAttribute('type');
+      fx.setAttribute('src', url);
+    });
+  </script>
+</body>
+</html>

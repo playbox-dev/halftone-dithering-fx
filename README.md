@@ -4,6 +4,30 @@ A browser-based halftone / dithering effect generator — the "OpenAI ad" dither
 
 No build step, no dependencies — just static HTML/CSS/JS.
 
+Two flavors:
+
+- **`/` (root)** — the original CPU canvas tool: upload, tune, and *export* PNG / SVG / WebM.
+- **`/webgl`** — `<halftone-fx>`, a GPU-accelerated custom element for using the effect **live on a website** (hero backgrounds, section art). Crisp at any DPI, ~zero CPU cost.
+
+## `<halftone-fx>` — live effect for your site
+
+Copy `webgl/halftone-fx.js` into your project and:
+
+```html
+<script src="halftone-fx.js"></script>
+
+<halftone-fx src="clip.mp4" grid="14" dot-color="#000" background="#fff"
+             style="width:100%;height:60vh"></halftone-fx>
+```
+
+Why it's cheap: instead of reading pixels back to JS every frame, it runs two GPU passes — (1) the source is downsampled to one texel per halftone cell (mipmap filtering computes the cell averages in hardware), (2) a fullscreen shader draws one anti-aliased dot per cell. No `getImageData`, no per-pixel JS loops, renders at `devicePixelRatio` so it stays sharp on retina/4K, and it auto-pauses when scrolled offscreen.
+
+Attributes (all reactive): `src`, `grid`, `dot-color`, `background` (hex or `transparent`), `brightness`, `contrast`, `gamma`, `dither` (`none`|`bayer`|`noise`), `multicolor`, `paused`. JS API: `el.play()`, `el.pause()`, `el.source = <img|video|canvas>`.
+
+Demo with live controls: serve the repo and open `/webgl/`.
+
+> Tip for websites: since the halftone destroys fine detail anyway, a small source video (e.g. 480p, heavily compressed) looks identical to a 1080p one — the dots stay razor sharp because they're drawn by the shader, not the video.
+
 ## Features
 
 - Live preview for images **and** video (frame-by-frame)
