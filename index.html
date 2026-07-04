@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Halftone Dithering FX</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+  <!-- Title -->
+  <header>
+    <h1>Halftone Dithering FX</h1>
+  </header>
+
+  <!-- partial:index.partial.html -->
+  <div class="app-container">
+    <div class="container">
+      <aside class="sidebar">
+
+        <!-- Controls Section -->
+
+        <div class="panel controls-panel">
+         <!-- Upload Section -->
+         <div class="upload-panel">
+           <div class="upload-area">
+            <label for="fileUpload" class="upload-label">
+              <span class="upload-icon">📁</span>
+              <span>Drop image/video or click to upload</span>
+            </label>
+            <input type="file" id="fileUpload" accept="image/*,video/*" class="upload-input">
+           </div>
+         </div>
+
+          <!-- Primary Controls -->
+      <h3>Primary</h3>
+          <div class="control-group">
+            <label for="gridSize">Grid Size</label>
+            <div class="slider-container">
+              <input type="range" id="gridSize" min="5" max="50" value="20">
+              <span class="value-display" id="gridSizeVal">20</span>
+            </div>
+          </div>
+
+          <!-- Image Adjustments -->
+          <div class="control-section">
+            <h3>Image Adjustments</h3>
+            <div class="control-group">
+              <label for="brightness">Brightness</label>
+              <div class="slider-container">
+                <input type="range" id="brightness" min="-100" max="100" value="20">
+                <span class="value-display" id="brightnessVal">20</span>
+              </div>
+            </div>
+            <div class="control-group">
+              <label for="contrast">Contrast</label>
+              <div class="slider-container">
+                <input type="range" id="contrast" min="-100" max="100" value="0">
+                <span class="value-display" id="contrastVal">0</span>
+              </div>
+            </div>
+            <div class="control-group">
+              <label for="gamma">Gamma</label>
+              <div class="slider-container">
+                <input type="range" id="gamma" min="0.1" max="3" step="0.1" value="1.0">
+                <span class="value-display" id="gammaVal">1.0</span>
+              </div>
+            </div>
+            <div class="control-group">
+              <label for="smoothing">Smoothing</label>
+              <div class="slider-container">
+                <input type="range" id="smoothing" min="0" max="5" step="0.5" value="0">
+                <span class="value-display" id="smoothingVal">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dithering Options -->
+          <div class="control-section">
+            <h3>Dithering</h3>
+            <div class="control-group">
+              <select id="ditherType" class="dither-select">
+        <option value="JarvisJudiceNinke">Jarvis-Judice-Ninke</option>
+        <option value="Stucki">Stucki</option>
+        <option value="Burkes">Burkes</option>
+                <option value="FloydSteinberg">Floyd‑Steinberg</option>
+                <option value="Ordered">Patterned Ordered</option>
+                <option value="Noise">Noise</option>
+                <option value="None" selected>No Extra Texture</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Background Color -->
+      <h3>Coloring</h3>
+          <div class="control-group">
+            <label for="backgroundColor">Background Color</label>
+            <input type="color" id="backgroundColor" value="#FFFFFF">
+          </div>
+
+          <!-- Multicolor Dots -->
+          <div class="control-group">
+            <input type="checkbox" id="multicolor">
+            <label for="multicolor">Multicolor Dots (Cancels Dot Color)</label>
+          </div>
+
+          <!-- Dot Color Picker -->
+          <div class="control-group">
+            <label for="dotColor">Dot Color</label>
+            <input type="color" id="dotColor" value="#000000">
+          </div>
+
+
+        <div class=" action-panel">
+          <button id="saveButton" class="btn btn-primary">Export PNG</button>
+      <button id="saveSVGButton" class="btn btn-primary">Export SVG</button>
+          <button id="saveVideoButton" class="btn btn-primary">Export Video</button>
+          <button id="stopRecordingButton" class="btn btn-primary" style="display: none;">Stop Recording</button>
+        </div>
+    <div class="action-panel">
+        <button id="resetButton" class="btn btn-secondary">Reset All</button>
+    </div>
+        </div>
+
+
+      </aside>
+
+      <main class="main-content">
+        <div class="canvas-container">
+          <canvas id="halftoneCanvas"></canvas>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+        <p>The OpenAI Ad Dithering Effect and Beyond. Original Code Idea by <a href="https://codepen.io/Mikhail-Bespalov/pen/dPyyZed" target="_blank">Mike Bespalov</a>. <br/> Updates and additions by <a href="https://bogdanrosu.com" target="_blank">Bogdan Rosu</a>.</p>
+    <!-- Dark Mode Toggle Button -->
+      <button id="darkModeToggle" class="btn btn-secondary dark-mode-toggle">Toggle Dark Mode</button>
+  </footer>
+
+  <!-- partial -->
+  <script src="./script.js"></script>
+   <script>
+    // Dark Mode Toggle Logic
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    darkModeToggle.addEventListener('click', () => {
+      document.body.classList.toggle('dark-mode');
+      darkModeToggle.textContent = document.body.classList.contains('dark-mode') ? 'Light Mode' : 'Dark Mode';
+    });
+  </script>
+</body>
+</html>
