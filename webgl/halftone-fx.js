@@ -14,7 +14,10 @@
  *   brightness   — -100..100 (default 20)
  *   contrast     — -100..100 (default 0)
  *   gamma        — 0.1..3 (default 1)
- *   dither       — none | bayer | noise (default none; noise animates)
+ *   dither       — none | bayer4 | bayer8 | grain | noise (default none; noise animates)
+ *                  bayer4/bayer8: ordered, temporally stable, retro-print look
+ *                  grain: interleaved gradient noise — blue-noise-like, stable, organic
+ *                  noise: white noise re-seeded ~30fps — deliberate film-grain flicker
  *   multicolor   — present = rainbow dots by brightness
  *   paused       — present = freeze rendering
  *
@@ -62,13 +65,29 @@
   uniform vec3 uDotColor;
   uniform vec4 uBg;
   uniform int uMulticolor;    // 0/1
-  uniform int uDither;        // 0 none, 1 bayer, 2 noise
+  uniform int uDither;        // 0 none, 1 bayer4, 2 bayer8, 3 grain, 4 noise
   uniform float uTime;
   out vec4 o;
 
   float bayer4(ivec2 p) {
     int m[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);
     return (float(m[(p.y & 3) * 4 + (p.x & 3)]) + 0.5) / 16.0;
+  }
+  float bayer8(ivec2 p) {
+    int m[64] = int[64](
+       0, 32,  8, 40,  2, 34, 10, 42,
+      48, 16, 56, 24, 50, 18, 58, 26,
+      12, 44,  4, 36, 14, 46,  6, 38,
+      60, 28, 52, 20, 62, 30, 54, 22,
+       3, 35, 11, 43,  1, 33,  9, 41,
+      51, 19, 59, 27, 49, 17, 57, 25,
+      15, 47,  7, 39, 13, 45,  5, 37,
+      63, 31, 55, 23, 61, 29, 53, 21);
+    return (float(m[(p.y & 7) * 8 + (p.x & 7)]) + 0.5) / 64.0;
+  }
+  // Interleaved gradient noise (Jimenez) — blue-noise-like, temporally stable.
+  float ign(vec2 p) {
+    return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
   }
   float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -88,6 +107,10 @@
     if (uDither == 1) {
       v = v < bayer4(cell) ? 0.0 : 1.0;
     } else if (uDither == 2) {
+      v = v < bayer8(cell) ? 0.0 : 1.0;
+    } else if (uDither == 3) {
+      v = v < ign(vec2(cell)) ? 0.0 : 1.0;
+    } else if (uDither == 4) {
       // Animated grain, stepped at ~30fps like film.
       float n = hash(vec2(cell) + floor(uTime * 30.0) * vec2(13.7, 7.3)) - 0.5;
       v = (v + n * 0.4) < 0.5 ? 0.0 : 1.0;
@@ -381,8 +404,8 @@
       gl.uniform3fv(this._u.main.dotColor, hexToRgba(this.getAttribute('dot-color'), [0, 0, 0, 1]).slice(0, 3));
       gl.uniform4fv(this._u.main.bg, hexToRgba(this.getAttribute('background'), [1, 1, 1, 1]));
       gl.uniform1i(this._u.main.multicolor, this.hasAttribute('multicolor') ? 1 : 0);
-      const dither = this.getAttribute('dither');
-      gl.uniform1i(this._u.main.dither, dither === 'bayer' ? 1 : dither === 'noise' ? 2 : 0);
+      const DITHER_CODES = { none: 0, bayer: 1, bayer4: 1, bayer8: 2, grain: 3, noise: 4 };
+      gl.uniform1i(this._u.main.dither, DITHER_CODES[this.getAttribute('dither')] || 0);
       gl.uniform1f(this._u.main.time, time || 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }

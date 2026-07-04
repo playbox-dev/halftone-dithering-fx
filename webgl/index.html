@@ -81,9 +81,9 @@
 
   <section class="hero">
     <halftone-fx id="fx"
-      src="https://i.imgur.com/5PrJCc2.mp4"
+      src="./assets/demo.mp4"
       grid="14"
-      brightness="20"
+      brightness="0"
       dot-color="#000000"
       background="#ffffff"></halftone-fx>
     <div class="hero-copy">
@@ -98,8 +98,8 @@
     <output id="gridOut">14</output>
 
     <label for="brightness">Bright</label>
-    <input type="range" id="brightness" min="-100" max="100" value="20">
-    <output id="brightnessOut">20</output>
+    <input type="range" id="brightness" min="-100" max="100" value="0">
+    <output id="brightnessOut">0</output>
 
     <label for="contrast">Contrast</label>
     <input type="range" id="contrast" min="-100" max="100" value="0">
@@ -111,9 +111,11 @@
 
     <label for="dither">Dither</label>
     <select id="dither">
-      <option value="none" selected>None</option>
-      <option value="bayer">Ordered (Bayer)</option>
-      <option value="noise">Noise (animated)</option>
+      <option value="none" selected>None (pure halftone)</option>
+      <option value="bayer4">Bayer 4&times;4 (retro)</option>
+      <option value="bayer8">Bayer 8&times;8 (finer)</option>
+      <option value="grain">Grain (blue-noise, stable)</option>
+      <option value="noise">Noise (animated flicker)</option>
     </select>
 
     <label for="dotColor">Dots</label>

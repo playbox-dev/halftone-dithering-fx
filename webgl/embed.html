@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>halftone-fx embed</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; }
+    halftone-fx { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <script src="./halftone-fx.js"></script>
+  <script>
+    // Configure entirely via query params, e.g.:
+    //   embed.html?grid=12&dot=111111&bg=f5f0e8&dither=bayer8
+    //   embed.html?src=https://your.cdn/clip.mp4&type=video&brightness=30
+    // Colors may omit the '#' (it can't appear raw in a URL).
+    const p = new URLSearchParams(location.search);
+    const fx = document.createElement('halftone-fx');
+
+    const ATTRS = {
+      src: 'src', type: 'type', grid: 'grid', dot: 'dot-color', bg: 'background',
+      brightness: 'brightness', contrast: 'contrast', gamma: 'gamma', dither: 'dither',
+    };
+    for (const [param, attr] of Object.entries(ATTRS)) {
+      if (p.has(param)) fx.setAttribute(attr, p.get(param));
+    }
+    if (p.has('multicolor')) fx.setAttribute('multicolor', '');
+
+    // Defaults: self-hosted demo loop, gentle boost like the original tool.
+    if (!fx.hasAttribute('src')) fx.setAttribute('src', './assets/demo.mp4');
+    if (!fx.hasAttribute('grid')) fx.setAttribute('grid', '12');
+    if (!fx.hasAttribute('brightness')) fx.setAttribute('brightness', '0');
+
+    document.body.appendChild(fx);
+  </script>
+</body>
+</html>
