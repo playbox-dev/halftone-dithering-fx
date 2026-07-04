@@ -68,13 +68,16 @@
       border-radius: 6px; padding: 4px 6px; width: 100%; height: 28px;
     }
     .panel .row-check { grid-column: 1 / 4; display: flex; gap: 8px; align-items: center; color: #999; }
-    .panel .upload { grid-column: 1 / 4; }
-    .panel .upload input { display: none; }
-    .panel .upload span {
-      display: block; text-align: center; padding: 8px;
-      border: 1px dashed #444; border-radius: 6px; color: #888; cursor: pointer;
+    .panel .help-link {
+      grid-column: 1 / 4; text-align: center; color: #888;
+      text-decoration: none; padding: 2px;
     }
-    .panel .upload span:hover { border-color: #888; color: #ccc; }
+    .panel .help-link:hover { color: #fff; }
+    .panel .export-btn {
+      grid-column: 1 / 4; padding: 9px; border: none; border-radius: 6px;
+      background: #fff; color: #111; font-weight: 600; font-size: 12px; cursor: pointer;
+    }
+    .panel .export-btn:hover { background: #ddd; }
   </style>
 </head>
 <body>
@@ -93,6 +96,12 @@
   </section>
 
   <div class="panel">
+    <label for="srcSelect">Source</label>
+    <select id="srcSelect">
+      <option value="./assets/demo.mp4" selected>demo.mp4</option>
+      <option value="./assets/horse.mp4">horse.mp4</option>
+    </select>
+
     <label for="grid">Grid</label>
     <input type="range" id="grid" min="4" max="40" value="14">
     <output id="gridOut">14</output>
@@ -129,10 +138,9 @@
       <label for="multicolor">Multicolor dots</label>
     </div>
 
-    <label class="upload">
-      <input type="file" id="fileUpload" accept="image/*,video/*">
-      <span>📁 Drop in your own image / video</span>
-    </label>
+    <button class="export-btn" id="exportIframe">📋 Export iframe (copy embed code)</button>
+
+    <a class="help-link" href="./help.html">❓ Help — embedding, STUDIO, adding assets</a>
   </div>
 
   <script src="./halftone-fx.js"></script>
@@ -158,13 +166,85 @@
       e.target.checked ? fx.setAttribute('multicolor', '') : fx.removeAttribute('multicolor');
     });
 
-    document.getElementById('fileUpload').addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const url = URL.createObjectURL(file);
-      if (file.type.startsWith('video/')) fx.setAttribute('type', 'video');
-      else fx.removeAttribute('type');
-      fx.setAttribute('src', url);
+    // Track what's playing so Export iframe can reference it by URL.
+    let currentSrc = './assets/demo.mp4';
+
+    document.getElementById('srcSelect').addEventListener('change', e => {
+      currentSrc = e.target.value;
+      fx.removeAttribute('type');
+      fx.setAttribute('src', currentSrc);
+    });
+
+    // Populate the Source dropdown from the repo's assets folder on GitHub,
+    // so committing a new file there makes it appear here — no code changes.
+    const ASSETS_API = 'https://api.github.com/repos/playbox-dev/halftone-dithering-fx/contents/webgl/assets';
+    const MEDIA_RE = /\.(mp4|webm|ogv|mov|m4v|png|jpe?g|gif|webp|avif)$/i;
+    (async () => {
+      try {
+        const r = await fetch(ASSETS_API, { headers: { Accept: 'application/vnd.github+json' } });
+        if (!r.ok) return; // keep the built-in options
+        const names = (await r.json())
+          .filter(f => f.type === 'file' && MEDIA_RE.test(f.name))
+          .map(f => f.name);
+        if (!names.length) return;
+        const sel = document.getElementById('srcSelect');
+        sel.innerHTML = '';
+        for (const n of names) {
+          const o = document.createElement('option');
+          o.value = './assets/' + n;
+          o.textContent = n;
+          sel.appendChild(o);
+        }
+        sel.value = names.includes('demo.mp4') ? './assets/demo.mp4' : './assets/' + names[0];
+        if (sel.value !== currentSrc) sel.dispatchEvent(new Event('change'));
+      } catch { /* offline — built-in options remain */ }
+    })();
+
+    // --- Export iframe ---
+    // Emits only params that differ from embed.html's defaults, so URLs stay short.
+    const EMBED_DEFAULTS = { src: './assets/demo.mp4', grid: '12', dot: '000000',
+                             bg: 'ffffff', brightness: '0', contrast: '0',
+                             gamma: '1', dither: 'none' };
+    const CANONICAL_EMBED = 'https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html';
+
+    function buildEmbedCode() {
+      const local = /^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname);
+      const base = local ? CANONICAL_EMBED : new URL('embed.html', location.href).href;
+      const p = new URLSearchParams();
+      if (currentSrc !== EMBED_DEFAULTS.src) p.set('src', currentSrc);
+      const vals = {
+        grid: document.getElementById('grid').value,
+        dot: document.getElementById('dotColor').value.slice(1),
+        bg: document.getElementById('bgColor').value.slice(1),
+        brightness: document.getElementById('brightness').value,
+        contrast: document.getElementById('contrast').value,
+        gamma: document.getElementById('gamma').value,
+        dither: document.getElementById('dither').value,
+      };
+      for (const [k, v] of Object.entries(vals)) {
+        if (v !== EMBED_DEFAULTS[k]) p.set(k, v);
+      }
+      if (document.getElementById('multicolor').checked) p.set('multicolor', '');
+      const q = p.toString().replace(/=(?=&|$)/g, '').replace(/%2F/gi, '/');
+      return `<iframe src="${base}${q ? '?' + q : ''}"\n` +
+             `        style="width:100%;height:100%;border:0;pointer-events:none"\n` +
+             `        allow="autoplay" loading="lazy" title="halftone animation"></iframe>`;
+    }
+
+    const exportBtn = document.getElementById('exportIframe');
+    exportBtn.addEventListener('click', async () => {
+      const code = buildEmbedCode();
+      window.__lastExport = code;
+      const label = exportBtn.textContent;
+      const done = '✓ Copied! Paste into your site builder';
+      try {
+        await navigator.clipboard.writeText(code);
+        exportBtn.textContent = done;
+      } catch {
+        window.prompt('Copy the embed code:', code);
+        exportBtn.textContent = done;
+      }
+      setTimeout(() => { exportBtn.textContent = label; }, 2500);
     });
   </script>
 </body>

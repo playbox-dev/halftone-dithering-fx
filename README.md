@@ -24,7 +24,7 @@ Why it's cheap: instead of reading pixels back to JS every frame, it runs two GP
 
 Attributes (all reactive): `src`, `grid`, `dot-color`, `background` (hex or `transparent`), `brightness`, `contrast`, `gamma`, `dither`, `multicolor`, `paused`. JS API: `el.play()`, `el.pause()`, `el.source = <img|video|canvas>`.
 
-**Live demo:** <https://playbox-dev.github.io/halftone-dithering-fx/webgl/>
+**Live demo:** <https://playbox-dev.github.io/halftone-dithering-fx/webgl/> — pick a source from `webgl/assets/` (the dropdown syncs with the repo), tune the look, then hit **Export iframe** for ready-to-paste embed code. Full guide: [help page](https://playbox-dev.github.io/halftone-dithering-fx/webgl/help.html).
 
 ### Picking a dither mode for animation
 
