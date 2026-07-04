@@ -603,7 +603,7 @@ saveSVGButton.addEventListener('click', () => {
 
   // Automatically load the default video.
   (function loadDefaultVideo() {
-    const videoURL = "https://i.imgur.com/5PrJCc2.mp4";
+    const videoURL = "./webgl/assets/horse.mp4"; // Muybridge horse (was https://i.imgur.com/5PrJCc2.mp4)
     isVideo = true;
     videoElement = document.createElement('video');
     videoElement.crossOrigin = "anonymous";
