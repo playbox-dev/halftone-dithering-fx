@@ -67,6 +67,13 @@
       background: #fff; color: #111; font-weight: 600; font-size: 12px; cursor: pointer;
     }
     .panel .export-btn:hover { background: #ddd; }
+    .panel .upload-btn {
+      grid-column: 1 / 4; padding: 7px; border: 1px dashed #444; border-radius: 6px;
+      background: transparent; color: #bbb; font-size: 12px; cursor: pointer;
+    }
+    .panel .upload-btn:hover { border-color: #888; color: #fff; }
+    .panel .upload-btn:disabled { cursor: wait; opacity: 0.6; }
+    .panel .upload-btn.error { border-color: #a33; color: #e88; }
   </style>
 </head>
 <body>
@@ -86,6 +93,9 @@
       <option value="./assets/demo.mp4" selected>demo.mp4</option>
       <option value="./assets/horse.mp4">horse.mp4</option>
     </select>
+
+    <button class="upload-btn" id="uploadBtn" type="button">⬆️ Upload your own media</button>
+    <input type="file" id="uploadInput" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime" hidden>
 
     <label for="grid">Grid</label>
     <input type="range" id="grid" min="4" max="40" value="14">
@@ -185,6 +195,8 @@
           .map(f => f.name);
         if (!names.length) return;
         const sel = document.getElementById('srcSelect');
+        // Keep uploaded entries (absolute URLs) — only the repo-asset options are rebuilt.
+        const uploaded = [...sel.options].filter(o => /^https?:/i.test(o.value));
         sel.innerHTML = '';
         for (const n of names) {
           const o = document.createElement('option');
@@ -192,10 +204,75 @@
           o.textContent = n;
           sel.appendChild(o);
         }
-        sel.value = names.includes('demo.mp4') ? './assets/demo.mp4' : './assets/' + names[0];
-        if (sel.value !== currentSrc) sel.dispatchEvent(new Event('change'));
+        for (const o of uploaded) sel.appendChild(o);
+        if (/^https?:/i.test(currentSrc)) {
+          sel.value = currentSrc;
+        } else {
+          sel.value = names.includes('demo.mp4') ? './assets/demo.mp4' : './assets/' + names[0];
+          if (sel.value !== currentSrc) sel.dispatchEvent(new Event('change'));
+        }
       } catch { /* offline — built-in options remain */ }
     })();
+
+    // --- Upload your own media ---
+    // Files go through a rate-limited Supabase Edge Function (max 50MB,
+    // image/video only) and come back as a public URL, so exported embeds
+    // work anywhere — not just with the repo's bundled assets.
+    // The anon key is public by design; the function enforces all limits.
+    const UPLOAD_ENDPOINT = 'https://kscnqkuxhelifwdwsvmp.supabase.co/functions/v1/halftone-upload';
+    const UPLOAD_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtzY25xa3V4aGVsaWZ3ZHdzdm1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2NTAzMzIsImV4cCI6MjA4NzIyNjMzMn0.qsmzoiMhF3S-9sqVNAZLSNPVSW8iq_Fa54GVrpG9yKY';
+    const UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
+
+    const uploadBtn = document.getElementById('uploadBtn');
+    const uploadInput = document.getElementById('uploadInput');
+    const uploadIdle = uploadBtn.textContent;
+
+    let uploadStatusTimer = 0;
+    function uploadStatus(text, isError) {
+      clearTimeout(uploadStatusTimer); // a stale reset must not clobber this status
+      uploadBtn.textContent = text;
+      uploadBtn.classList.toggle('error', !!isError);
+      if (isError) uploadStatusTimer = setTimeout(() => {
+        uploadBtn.textContent = uploadIdle;
+        uploadBtn.classList.remove('error');
+      }, 4000);
+    }
+
+    uploadBtn.addEventListener('click', () => uploadInput.click());
+    uploadInput.addEventListener('change', async () => {
+      const file = uploadInput.files[0];
+      uploadInput.value = '';
+      if (!file) return;
+      if (file.size > UPLOAD_MAX_BYTES) return uploadStatus('✗ Over the 50MB limit', true);
+
+      uploadBtn.disabled = true;
+      uploadStatus('⏳ Uploading…');
+      try {
+        const r = await fetch(UPLOAD_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer ' + UPLOAD_ANON_KEY,
+            'Content-Type': file.type || 'application/octet-stream',
+          },
+          body: file,
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || ('Upload failed (' + r.status + ')'));
+
+        const sel = document.getElementById('srcSelect');
+        const o = document.createElement('option');
+        o.value = data.url;
+        o.textContent = '⬆ ' + file.name;
+        sel.appendChild(o);
+        sel.value = data.url;
+        sel.dispatchEvent(new Event('change'));
+        uploadStatus(uploadIdle);
+      } catch (err) {
+        uploadStatus('✗ ' + err.message, true);
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
 
     // --- Export iframe ---
     // Emits only params that differ from embed.html's defaults, so URLs stay short.
