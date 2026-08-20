@@ -3,28 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>halftone-fx — Help</title>
+  <title>mimono shikaku — Help</title>
   <style>
+    :root { --base-gray: #f3f3f3; --play-red: #ff3110; --text-red: #c32308; --ink: #0d0d0d; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: 'Inter', 'Helvetica', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0d0d0d;
-      color: #ddd;
+      background: var(--base-gray);
+      color: #222;
       line-height: 1.65;
     }
     .wrap { max-width: 760px; margin: 0 auto; padding: 48px 24px 96px; }
-    h1 { font-size: 2.2rem; letter-spacing: -0.03em; margin: 0 0 4px; color: #fff; }
-    .sub { color: #888; margin: 0 0 40px; }
+    h1 { font-size: 2.2rem; letter-spacing: -0.05em; margin: 0 0 4px; color: var(--ink); }
+    .sub { color: #555; margin: 0 0 40px; }
     h2 {
-      font-size: 1.15rem; color: #fff; letter-spacing: -0.01em;
-      margin: 48px 0 12px; padding-top: 24px; border-top: 1px solid #222;
+      font-size: 1.15rem; color: var(--ink); letter-spacing: -0.01em;
+      margin: 48px 0 12px; padding-top: 24px; border-top: 1px solid #bbb;
     }
-    a { color: #9ecbff; text-decoration: none; }
+    a { color: var(--text-red); text-decoration: none; }
     a:hover { text-decoration: underline; }
     code, pre {
       font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-      background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px;
+      background: #fff; border: 1px solid #bbb; border-radius: 0;
     }
     code { padding: 1px 6px; font-size: 0.88em; }
     pre {
@@ -32,24 +33,24 @@
     }
     pre code { background: none; border: none; padding: 0; }
     table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
-    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #222; vertical-align: top; }
-    th { color: #888; font-weight: 600; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #ccc; vertical-align: top; }
+    th { color: #555; font-weight: 600; }
     td:first-child code { white-space: nowrap; }
     ol li, ul li { margin-bottom: 8px; }
     .tip {
-      background: #14181f; border: 1px solid #223047; border-radius: 8px;
+      background: #fff; border-left: 4px solid var(--play-red); border-radius: 0;
       padding: 12px 16px; margin: 16px 0; font-size: 14px;
     }
-    .tip strong { color: #9ecbff; }
+    .tip strong { color: var(--text-red); }
     .nav { margin-bottom: 32px; font-size: 14px; }
     .nav a { margin-right: 16px; }
-    footer { margin-top: 64px; color: #666; font-size: 13px; border-top: 1px solid #222; padding-top: 24px; }
+    footer { margin-top: 64px; color: #666; font-size: 13px; border-top: 1px solid #bbb; padding-top: 24px; }
   </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>halftone-fx</h1>
-  <p class="sub">Live GPU halftone dithering for websites — help &amp; embedding guide</p>
+  <h1>mimono shikaku</h1>
+  <p class="sub">四角 / 視覚 — live GPU square halftone for websites</p>
 
   <nav class="nav">
     <a href="./index.html">← Playground</a>
@@ -62,7 +63,8 @@
   </nav>
 
   <p>
-    <strong>halftone-fx</strong> renders an image or video as animated halftone dots,
+    <strong>mimono shikaku</strong> uses the stable <code>&lt;halftone-fx&gt;</code> component
+    to render an image or video as animated square marks,
     live in the browser, on the GPU. Instead of exporting a heavy video file, you embed
     a tiny program: it stays razor-sharp on any screen, costs ~0.1&nbsp;ms of CPU per frame,
     and a whole animated hero background weighs a few hundred kilobytes.
@@ -73,9 +75,9 @@
     <li>Open the <a href="./index.html">playground</a>.</li>
     <li>Pick a clip from <strong>Source</strong> (the list mirrors this repo's
         <code>webgl/assets/</code> folder) and tune the sliders until it looks right.</li>
-    <li>Click <strong>📋 Export iframe</strong> — the finished embed code is copied
-        to your clipboard.</li>
-    <li>Paste it into your site builder's embed/HTML element. Done.</li>
+    <li>Click <strong>⬇ Download PNG</strong> for a full-resolution still with transparency,
+        or <strong>📋 Export iframe</strong> for the live version.</li>
+    <li>Use the PNG directly, or paste the iframe into your site builder's embed/HTML element.</li>
   </ol>
 
   <h2 id="studio">Embedding in STUDIO (studio.design)</h2>
@@ -85,7 +87,8 @@
     <li>Select the box, open the settings panel on the right, and paste the code from
         <strong>Export iframe</strong> into the <strong>埋め込みコード</strong> (embed code) field.</li>
     <li>Size and position the box like any element — for a hero background, make it fill
-        the section and layer your text boxes on top.</li>
+        the section and layer your text boxes on top. Keep its width and height equal for
+        the default 1:1 shikaku composition.</li>
     <li>The editor canvas may show a placeholder instead of the animation — that's normal.
         Check <strong>プレビュー</strong> (preview), then <strong>公開</strong> (publish).</li>
   </ol>
@@ -98,25 +101,34 @@
     <strong>Backgrounds:</strong> the exported code includes <code>pointer-events:none</code>
     so clicks and scrolling pass through to your page. Remove it if the animation should be
     interactive. Set the <code>bg</code> param to your page's background color so the
-    iframe edges are invisible.
+     iframe edges are invisible. The exported iframe includes <code>aspect-ratio:1/1</code>
+     so the default box stays square.
   </div>
 
   <h2 id="params">URL parameters</h2>
   <p>The embed page is configured entirely by its URL — edit params and reload to restyle,
      no code changes ever:</p>
-  <pre><code>https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html?src=./assets/horse.mp4&amp;grid=9&amp;dither=grain</code></pre>
+  <pre><code>https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html?src=./assets/horse.mp4&amp;grid=80&amp;shape=square&amp;size=42&amp;threshold=50</code></pre>
   <table>
     <tr><th>Param</th><th>Values</th><th>Meaning</th></tr>
     <tr><td><code>src</code></td><td>URL</td><td>Image or video. Relative (<code>./assets/…</code>) or any CORS-accessible absolute URL. Add <code>type=video</code> for video URLs without a file extension.</td></tr>
-    <tr><td><code>grid</code></td><td>3–50</td><td>Halftone cell size in px. Smaller = finer dots. Default 12.</td></tr>
-    <tr><td><code>dot</code></td><td>hex</td><td>Dot color, without <code>#</code> (e.g. <code>1a1a2e</code>). Default black.</td></tr>
-    <tr><td><code>bg</code></td><td>hex / <code>transparent</code></td><td>Background color. Default white.</td></tr>
-    <tr><td><code>brightness</code></td><td>-100…100</td><td>Default 0.</td></tr>
+    <tr><td><code>grid</code></td><td>8–160</td><td>Halftone cell size in px. Larger = fewer marks. Default 80.</td></tr>
+    <tr><td><code>shape</code></td><td><code>square</code> / <code>circle</code></td><td>Mark geometry. Default <code>square</code>; <code>circle</code> preserves the legacy look.</td></tr>
+    <tr><td><code>size</code></td><td>0–100</td><td>Maximum mark size within each cell. Lower values create more space between squares. Default 42.</td></tr>
+    <tr><td><code>threshold</code></td><td>0–100</td><td>Hides marks smaller than this percentage. Raise it to remove small peripheral squares. Default 50.</td></tr>
+    <tr><td><code>dot</code></td><td>hex</td><td>Mark color, without <code>#</code> (e.g. <code>ff3110</code>). Default mimono Play Red.</td></tr>
+    <tr><td><code>bg</code></td><td>hex / <code>transparent</code></td><td>Background color. Default <code>transparent</code>.</td></tr>
+    <tr><td><code>brightness</code></td><td>-100…100</td><td>Raises or lowers source luminance. Default 12 for a lighter, sparser result.</td></tr>
     <tr><td><code>contrast</code></td><td>-100…100</td><td>Default 0.</td></tr>
     <tr><td><code>gamma</code></td><td>0.1–3</td><td>Default 1.</td></tr>
     <tr><td><code>dither</code></td><td><code>none</code> <code>bayer4</code> <code>bayer8</code> <code>grain</code> <code>noise</code></td><td>See <a href="#dither">dither modes</a>. Default none.</td></tr>
-    <tr><td><code>multicolor</code></td><td>flag</td><td>Rainbow dots colored by brightness.</td></tr>
+    <tr><td><code>multicolor</code></td><td>flag</td><td>Rainbow marks colored by brightness.</td></tr>
   </table>
+  <div class="tip">
+    <strong>Sparse mimono logo preset:</strong> <code>grid=80</code>, <code>size=42</code>,
+    <code>threshold=50</code>, <code>brightness=12</code>. Grid controls how many squares
+    appear; size controls the gap between them.
+  </div>
 
   <h2 id="assets">Adding your own image / video</h2>
   <p>Assets live in the repo, so they're versioned and served with correct CORS headers.
@@ -130,7 +142,7 @@
   </ol>
   <div class="tip">
     <strong>Keep files small — it's free.</strong> The halftone destroys fine detail, so a
-    640×360 heavily-compressed clip looks identical to 1080p. The dots are drawn by the
+    640×360 heavily-compressed clip looks identical to 1080p. The marks are drawn by the
     shader and stay sharp regardless. Recommended encode:
     <pre><code>ffmpeg -i input.mp4 -vf scale=640:360 -c:v libx264 -pix_fmt yuv420p \
        -crf 30 -preset veryslow -movflags +faststart -an output.mp4</code></pre>
@@ -143,7 +155,7 @@
      which flickers on purpose:</p>
   <table>
     <tr><th>Mode</th><th>Look</th></tr>
-    <tr><td><code>none</code></td><td>Smooth tonal halftone — dot <em>size</em> carries the tone. Best default.</td></tr>
+    <tr><td><code>none</code></td><td>Smooth tonal halftone — square <em>size</em> carries the tone. Best default.</td></tr>
     <tr><td><code>bayer4</code></td><td>Coarse retro print / CRT crosshatch.</td></tr>
     <tr><td><code>bayer8</code></td><td>Finer retro pattern, more tonal steps.</td></tr>
     <tr><td><code>grain</code></td><td>Organic, editorial — blue-noise-like, no visible pattern.</td></tr>
@@ -167,7 +179,7 @@
   <p><strong><code>bg=transparent</code> looks white when I open the embed URL directly.</strong><br>
      Expected — a standalone browser tab has nothing behind the page, so you see the
      browser's own default backdrop. The transparency is real: put the iframe on a page
-     (or in STUDIO) and the page shows through between the dots. Both <code>bg</code> and
+     (or in STUDIO) and the page shows through between the marks. Both <code>bg</code> and
      <code>background</code> work as the param name.</p>
   <p><strong>The video doesn't autoplay.</strong><br>
      Keep <code>allow="autoplay"</code> on the iframe. Playback is muted + inline, which all
@@ -187,7 +199,7 @@
     <a href="./index.html">Playground</a> ·
     <a href="../index.html">Classic export tool</a><br>
     Original effect idea by <a href="https://codepen.io/Mikhail-Bespalov/pen/dPyyZed">Mike Bespalov</a>,
-    extended by <a href="https://bogdanrosu.com">Bogdan Rosu</a>. GPU component &amp; docs by the Playbox team.
+    extended by <a href="https://bogdanrosu.com">Bogdan Rosu</a>. GPU component &amp; docs by Playbox, now mimono.
   </footer>
 </div>
 </body>

@@ -3,23 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>halftone-fx — GPU halftone for websites</title>
+  <title>mimono shikaku — square halftone playground</title>
   <style>
+    :root {
+      --base-gray: #f3f3f3;
+      --play-red: #ff3110;
+      --text-red: #c32308;
+      --ink: #0d0d0d;
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: 'Inter', 'Helvetica', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0d0d0d;
-      color: #eee;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: var(--ink);
+      color: var(--ink);
     }
 
-    /* The whole point: <halftone-fx> as a live hero background */
+    /* Shikaku means both square (四角) and visual (視覚): keep the stage 1:1. */
     .hero {
       position: relative;
-      height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      width: min(100vw, 100vh);
+      aspect-ratio: 1;
+      background: var(--base-gray);
+      overflow: hidden;
     }
     .hero halftone-fx {
       position: absolute;
@@ -30,67 +40,131 @@
     .hero.checker {
       background: repeating-conic-gradient(#1a1a1a 0% 25%, #2e2e2e 0% 50%) 50% / 28px 28px;
     }
+    .brand-lockup {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 11;
+      display: grid;
+      gap: 3px;
+      padding: 11px 13px 10px;
+      background: var(--play-red);
+      color: var(--ink);
+      line-height: 1;
+    }
+    .brand-name {
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: -0.055em;
+    }
+    .brand-concept {
+      font-family: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+      font-size: 9px;
+      font-style: italic;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
     /* Control panel */
     .panel {
       position: fixed;
       bottom: 16px;
       left: 16px;
       z-index: 10;
-      background: rgba(20, 20, 20, 0.85);
+      background: rgba(243, 243, 243, 0.92);
       backdrop-filter: blur(10px);
-      border: 1px solid #2a2a2a;
-      border-radius: 10px;
+      border: 1px solid var(--ink);
       padding: 14px 16px;
       display: grid;
       grid-template-columns: auto 1fr auto;
       gap: 8px 12px;
       align-items: center;
       font-size: 12px;
-      width: min(340px, calc(100vw - 32px));
+      width: min(360px, calc(100vw - 32px));
     }
-    .panel label { color: #999; }
-    .panel input[type="range"] { width: 100%; accent-color: #fff; }
-    .panel output { min-width: 34px; text-align: right; color: #ccc; font-variant-numeric: tabular-nums; }
+    .panel label { color: #444; }
+    .panel input[type="range"] { width: 100%; accent-color: var(--play-red); }
+    .panel input[type="checkbox"] { accent-color: var(--play-red); }
+    .panel output { min-width: 34px; text-align: right; color: #222; font-variant-numeric: tabular-nums; }
     .panel select, .panel input[type="color"] {
       grid-column: 2 / 4;
-      background: #1a1a1a; color: #eee; border: 1px solid #333;
-      border-radius: 6px; padding: 4px 6px; width: 100%; height: 28px;
+      background: #fff; color: var(--ink); border: 1px solid var(--ink);
+      border-radius: 0; padding: 4px 6px; width: 100%; height: 28px;
     }
-    .panel .row-check { grid-column: 1 / 4; display: flex; gap: 8px; align-items: center; color: #999; }
+    .panel .row-check { grid-column: 1 / 4; display: flex; gap: 8px; align-items: center; color: #444; }
     .panel .help-link {
-      grid-column: 1 / 4; text-align: center; color: #888;
+      grid-column: 1 / 4; text-align: center; color: #555;
       text-decoration: none; padding: 2px;
     }
-    .panel .help-link:hover { color: #fff; }
+    .panel .help-link:hover { color: var(--text-red); }
     .panel .export-btn {
-      grid-column: 1 / 4; padding: 9px; border: none; border-radius: 6px;
-      background: #fff; color: #111; font-weight: 600; font-size: 12px; cursor: pointer;
+      grid-column: 1 / 4; padding: 9px; border: 1px solid var(--play-red); border-radius: 0;
+      background: var(--play-red); color: var(--ink); font-weight: 700; font-size: 12px; cursor: pointer;
     }
-    .panel .export-btn:hover { background: #ddd; }
+    .panel .export-btn:hover { background: var(--ink); border-color: var(--ink); color: #fff; }
+    .panel .embed-btn { background: var(--ink); border-color: var(--ink); color: #fff; }
+    .panel .embed-btn:hover { background: var(--play-red); border-color: var(--play-red); color: var(--ink); }
     .panel .upload-btn {
-      grid-column: 1 / 4; padding: 7px; border: 1px dashed #444; border-radius: 6px;
-      background: transparent; color: #bbb; font-size: 12px; cursor: pointer;
+      grid-column: 1 / 4; padding: 7px; border: 1px dashed var(--ink); border-radius: 0;
+      background: transparent; color: #333; font-size: 12px; cursor: pointer;
     }
-    .panel .upload-btn:hover { border-color: #888; color: #fff; }
+    .panel .upload-btn:hover { border-color: var(--play-red); color: var(--text-red); }
     .panel .upload-btn:disabled { cursor: wait; opacity: 0.6; }
-    .panel .upload-btn.error { border-color: #a33; color: #e88; }
+    .panel .upload-btn.error { border-color: #a00; color: #a00; }
+    @media (min-width: 601px) and (max-height: 520px) {
+      .panel { max-height: calc(100vh - 32px); overflow-y: auto; }
+      .brand-lockup { left: auto; right: 16px; }
+    }
+    @media (max-width: 600px) {
+      body {
+        display: block;
+        min-height: 100vh;
+        overflow-x: hidden;
+        overflow-y: auto;
+        background: var(--base-gray);
+      }
+      .hero { width: 100vw; }
+      .brand-lockup {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+      }
+      .panel {
+        position: relative;
+        inset: auto;
+        width: 100%;
+        max-height: none;
+        overflow: visible;
+        border-right: 0;
+        border-bottom: 0;
+        border-left: 0;
+      }
+    }
   </style>
 </head>
 <body>
 
-  <section class="hero">
+  <section class="hero checker">
     <halftone-fx id="fx"
-      src="./assets/demo.mp4"
-      grid="14"
-      brightness="0"
-      dot-color="#000000"
-      background="#ffffff"></halftone-fx>
+      src="./assets/mimono-circle.jpeg"
+      grid="80"
+      shape="square"
+      threshold="50"
+      mark-size="42"
+      brightness="12"
+      dot-color="#ff3110"
+      background="transparent"></halftone-fx>
   </section>
+
+  <div class="brand-lockup" aria-label="mimono shikaku">
+    <span class="brand-name">mimono</span>
+    <span class="brand-concept">shikaku / 四角・視覚</span>
+  </div>
 
   <div class="panel">
     <label for="srcSelect">Source</label>
     <select id="srcSelect">
-      <option value="./assets/demo.mp4" selected>demo.mp4</option>
+      <option value="./assets/mimono-circle.jpeg" selected>mimono-circle.jpeg</option>
+      <option value="./assets/demo.mp4">demo.mp4</option>
       <option value="./assets/horse.mp4">horse.mp4</option>
     </select>
 
@@ -98,12 +172,20 @@
     <input type="file" id="uploadInput" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime" hidden>
 
     <label for="grid">Grid</label>
-    <input type="range" id="grid" min="4" max="40" value="14">
-    <output id="gridOut">14</output>
+    <input type="range" id="grid" min="8" max="160" value="80">
+    <output id="gridOut">80</output>
+
+    <label for="markSize">Mark size</label>
+    <input type="range" id="markSize" min="5" max="100" value="42">
+    <output id="markSizeOut">42</output>
 
     <label for="brightness">Bright</label>
-    <input type="range" id="brightness" min="-100" max="100" value="0">
-    <output id="brightnessOut">0</output>
+    <input type="range" id="brightness" min="-100" max="100" value="12">
+    <output id="brightnessOut">12</output>
+
+    <label for="threshold">Threshold</label>
+    <input type="range" id="threshold" min="0" max="100" value="50">
+    <output id="thresholdOut">50</output>
 
     <label for="contrast">Contrast</label>
     <input type="range" id="contrast" min="-100" max="100" value="0">
@@ -122,23 +204,30 @@
       <option value="noise">Noise (animated flicker)</option>
     </select>
 
-    <label for="dotColor">Dots</label>
-    <input type="color" id="dotColor" value="#000000">
+    <label for="shape">Shape</label>
+    <select id="shape">
+      <option value="square" selected>Square / 四角</option>
+      <option value="circle">Circle (legacy)</option>
+    </select>
+
+    <label for="dotColor">Marks</label>
+    <input type="color" id="dotColor" value="#ff3110">
 
     <label for="bgColor">Background</label>
-    <input type="color" id="bgColor" value="#ffffff">
+    <input type="color" id="bgColor" value="#f3f3f3" disabled>
 
     <div class="row-check">
-      <input type="checkbox" id="transparentBg">
-      <label for="transparentBg">Transparent background (dots over your page)</label>
+      <input type="checkbox" id="transparentBg" checked>
+      <label for="transparentBg">Transparent background (marks over your page)</label>
     </div>
 
     <div class="row-check">
       <input type="checkbox" id="multicolor">
-      <label for="multicolor">Multicolor dots</label>
+      <label for="multicolor">Multicolor marks</label>
     </div>
 
-    <button class="export-btn" id="exportIframe">📋 Export iframe (copy embed code)</button>
+    <button class="export-btn" id="downloadPng">⬇ Download PNG</button>
+    <button class="export-btn embed-btn" id="exportIframe">📋 Export iframe (copy embed code)</button>
 
     <a class="help-link" href="./help.html">❓ Help — embedding, STUDIO, adding assets</a>
   </div>
@@ -155,10 +244,13 @@
       });
     };
     bind('grid', 'grid');
+    bind('markSize', 'mark-size');
     bind('brightness', 'brightness');
+    bind('threshold', 'threshold');
     bind('contrast', 'contrast');
     bind('gamma', 'gamma');
     bind('dither', 'dither');
+    bind('shape', 'shape');
     bind('dotColor', 'dot-color');
     bind('bgColor', 'background');
 
@@ -174,7 +266,7 @@
     });
 
     // Track what's playing so Export iframe can reference it by URL.
-    let currentSrc = './assets/demo.mp4';
+    let currentSrc = './assets/mimono-circle.jpeg';
 
     document.getElementById('srcSelect').addEventListener('change', e => {
       currentSrc = e.target.value;
@@ -190,12 +282,22 @@
       try {
         const r = await fetch(ASSETS_API, { headers: { Accept: 'application/vnd.github+json' } });
         if (!r.ok) return; // keep the built-in options
-        const names = (await r.json())
+        const repoNames = (await r.json())
           .filter(f => f.type === 'file' && MEDIA_RE.test(f.name))
           .map(f => f.name);
-        if (!names.length) return;
+        if (!repoNames.length) return;
         const sel = document.getElementById('srcSelect');
-        // Keep uploaded entries (absolute URLs) — only the repo-asset options are rebuilt.
+        // Preserve bundled options during the short GitHub API cache window after deploy.
+        const bundledNames = [...sel.options]
+          .filter(o => o.value.startsWith('./assets/'))
+          .map(o => o.value.slice('./assets/'.length));
+        const names = [...new Set([...bundledNames, ...repoNames])];
+        names.sort((a, b) => {
+          if (a === 'mimono-circle.jpeg') return -1;
+          if (b === 'mimono-circle.jpeg') return 1;
+          return a.localeCompare(b);
+        });
+        // Keep uploaded entries (absolute URLs) — repo-asset options are rebuilt.
         const uploaded = [...sel.options].filter(o => /^https?:/i.test(o.value));
         sel.innerHTML = '';
         for (const n of names) {
@@ -208,7 +310,12 @@
         if (/^https?:/i.test(currentSrc)) {
           sel.value = currentSrc;
         } else {
-          sel.value = names.includes('demo.mp4') ? './assets/demo.mp4' : './assets/' + names[0];
+          const currentName = currentSrc.startsWith('./assets/')
+            ? currentSrc.slice('./assets/'.length) : '';
+          sel.value = currentName && names.includes(currentName)
+            ? currentSrc
+            : names.includes('mimono-circle.jpeg')
+              ? './assets/mimono-circle.jpeg' : './assets/' + names[0];
           if (sel.value !== currentSrc) sel.dispatchEvent(new Event('change'));
         }
       } catch { /* offline — built-in options remain */ }
@@ -274,11 +381,37 @@
       }
     });
 
+    // --- Download PNG ---
+    const downloadBtn = document.getElementById('downloadPng');
+    downloadBtn.addEventListener('click', async () => {
+      const label = downloadBtn.textContent;
+      downloadBtn.disabled = true;
+      downloadBtn.textContent = 'Rendering PNG…';
+      try {
+        const blob = await fx.snapshot();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'mimono-shikaku.png';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        downloadBtn.textContent = '✓ PNG downloaded';
+      } catch (err) {
+        console.error(err);
+        downloadBtn.textContent = '✗ Download failed';
+      } finally {
+        downloadBtn.disabled = false;
+        setTimeout(() => { downloadBtn.textContent = label; }, 2500);
+      }
+    });
+
     // --- Export iframe ---
     // Emits only params that differ from embed.html's defaults, so URLs stay short.
-    const EMBED_DEFAULTS = { src: './assets/demo.mp4', grid: '12', dot: '000000',
-                             bg: 'ffffff', brightness: '0', contrast: '0',
-                             gamma: '1', dither: 'none' };
+    const EMBED_DEFAULTS = { src: './assets/mimono-circle.jpeg', grid: '80', shape: 'square',
+                             size: '42', threshold: '50', dot: 'ff3110', bg: 'transparent', brightness: '12',
+                             contrast: '0', gamma: '1', dither: 'none' };
     const CANONICAL_EMBED = 'https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html';
 
     function buildEmbedCode() {
@@ -288,6 +421,9 @@
       if (currentSrc !== EMBED_DEFAULTS.src) p.set('src', currentSrc);
       const vals = {
         grid: document.getElementById('grid').value,
+        shape: document.getElementById('shape').value,
+        size: document.getElementById('markSize').value,
+        threshold: document.getElementById('threshold').value,
         dot: document.getElementById('dotColor').value.slice(1),
         bg: document.getElementById('transparentBg').checked
           ? 'transparent' : document.getElementById('bgColor').value.slice(1),
@@ -302,8 +438,8 @@
       if (document.getElementById('multicolor').checked) p.set('multicolor', '');
       const q = p.toString().replace(/=(?=&|$)/g, '').replace(/%2F/gi, '/');
       return `<iframe src="${base}${q ? '?' + q : ''}"\n` +
-             `        style="width:100%;height:100%;border:0;pointer-events:none"\n` +
-             `        allow="autoplay" loading="lazy" title="halftone animation"></iframe>`;
+             `        style="width:100%;aspect-ratio:1/1;display:block;border:0;pointer-events:none"\n` +
+             `        allow="autoplay" loading="lazy" title="mimono shikaku visual"></iframe>`;
     }
 
     const exportBtn = document.getElementById('exportIframe');

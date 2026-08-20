@@ -1,33 +1,39 @@
 /*
- * <halftone-fx> — crisp, GPU-accelerated halftone dithering as a drop-in custom element.
+ * <halftone-fx> — crisp, GPU-accelerated shikaku halftone as a drop-in custom element.
  *
  * Usage:
  *   <script src="halftone-fx.js"></script>
- *   <halftone-fx src="clip.mp4" grid="14" dot-color="#000" background="#fff"
+ *   <halftone-fx src="clip.mp4" grid="80" shape="square" threshold="50"
+ *                mark-size="42" brightness="12"
+ *                dot-color="#ff3110" background="transparent"
  *                style="width:100%;height:60vh"></halftone-fx>
  *
  * Attributes (all live-reactive):
  *   src          — image or video URL (video detected by extension, or force with type="video")
- *   grid         — cell size in CSS px (default 14)
- *   dot-color    — hex color of dots (default #000000)
- *   background   — hex color, or "transparent" (default #ffffff)
- *   brightness   — -100..100 (default 20)
+ *   grid         — cell size in CSS px (default 80)
+ *   shape        — square | circle (default square)
+ *   threshold    — hide marks smaller than this percentage, 0..100 (default 50)
+ *   mark-size    — scale every visible mark, 0..100 (default 42)
+ *   dot-color    — hex color of marks (default #ff3110)
+ *   background   — hex color, or "transparent" (default transparent)
+ *   brightness   — -100..100 (default 12)
  *   contrast     — -100..100 (default 0)
  *   gamma        — 0.1..3 (default 1)
  *   dither       — none | bayer4 | bayer8 | grain | noise (default none; noise animates)
  *                  bayer4/bayer8: ordered, temporally stable, retro-print look
  *                  grain: interleaved gradient noise — blue-noise-like, stable, organic
  *                  noise: white noise re-seeded ~30fps — deliberate film-grain flicker
- *   multicolor   — present = rainbow dots by brightness
+ *   multicolor   — present = rainbow marks by brightness
  *   paused       — present = freeze rendering
  *
- * JS API: el.play(), el.pause(), el.source = <img|video|canvas element>
+ * JS API: el.play(), el.pause(), el.snapshot(), el.source = <img|video|canvas element>
  *
  * How it works (2 GPU passes, no CPU pixel work):
  *   1. Downsample: source → tiny texture with one texel per halftone cell;
  *      mipmap filtering computes each cell's average brightness in hardware.
- *   2. Dots: fullscreen shader — each pixel texelFetches its cell value and
- *      draws an anti-aliased circle. Renders at devicePixelRatio for crispness.
+ *   2. Marks: fullscreen shader — each pixel texelFetches its cell value and
+ *      draws an anti-aliased square (or legacy circle). Renders at
+ *      devicePixelRatio for crispness.
  */
 (() => {
   'use strict';
@@ -45,10 +51,18 @@
   precision highp float;
   uniform sampler2D uSrc;
   uniform float uBrightness, uContrast, uGamma;
+  uniform float uSrcAspect, uDstAspect;
   in vec2 vUv;
   out vec4 o;
   void main() {
-    vec3 c = texture(uSrc, vUv).rgb;
+    // Cover-crop the source into the output so square canvases never stretch it.
+    vec2 uv = vUv;
+    if (uSrcAspect > uDstAspect) {
+      uv.x = (uv.x - 0.5) * (uDstAspect / uSrcAspect) + 0.5;
+    } else {
+      uv.y = (uv.y - 0.5) * (uSrcAspect / uDstAspect) + 0.5;
+    }
+    vec3 c = texture(uSrc, uv).rgb;
     float g = dot(c, vec3(0.299, 0.587, 0.114));
     g = uContrast * (g - 0.5) + 0.5 + uBrightness;
     g = clamp(g, 0.0, 1.0);
@@ -56,7 +70,7 @@
     o = vec4(g, g, g, 1.0);
   }`;
 
-  // Pass 2: one anti-aliased dot per cell.
+  // Pass 2: one anti-aliased mark per cell.
   const FS_MAIN = `#version 300 es
   precision highp float;
   uniform sampler2D uCells;
@@ -66,6 +80,9 @@
   uniform vec4 uBg;
   uniform int uMulticolor;    // 0/1
   uniform int uDither;        // 0 none, 1 bayer4, 2 bayer8, 3 grain, 4 noise
+  uniform int uShape;         // 0 square, 1 circle
+  uniform float uThreshold;   // minimum normalized mark size
+  uniform float uMarkScale;   // spacing: maximum fraction of each cell occupied
   uniform float uTime;
   out vec4 o;
 
@@ -116,10 +133,19 @@
       v = (v + n * 0.4) < 0.5 ? 0.0 : 1.0;
     }
 
-    float r = uGrid * 0.5 * (1.0 - v);
+    float markSize = 1.0 - v;
+    float halfSize = uGrid * 0.5 * markSize * uMarkScale;
     vec2 center = (vec2(cell) + 0.5) * uGrid;
-    float d = length(fc - center);
-    float m = 1.0 - smoothstep(r - 0.75, r + 0.75, d);
+    vec2 delta = abs(fc - center);
+    float d = uShape == 1 ? length(delta) : max(delta.x, delta.y);
+    float m;
+    if (markSize < uThreshold || v >= 0.999) {
+      m = 0.0; // Pure white must not leave a sub-pixel speck.
+    } else if (uShape == 0 && v <= 0.001 && uMarkScale >= 0.999) {
+      m = 1.0; // Full black squares tile cleanly without grid seams.
+    } else {
+      m = 1.0 - smoothstep(halfSize - 0.75, halfSize + 0.75, d);
+    }
 
     vec3 dotc = uMulticolor == 1 ? hue2rgb(v) : uDotColor;
     // Premultiplied output (correct for opaque and transparent backgrounds).
@@ -162,7 +188,7 @@
 
   class HalftoneFX extends HTMLElement {
     static get observedAttributes() {
-      return ['src', 'type', 'grid', 'dot-color', 'background', 'brightness',
+      return ['src', 'type', 'grid', 'shape', 'threshold', 'mark-size', 'dot-color', 'background', 'brightness',
               'contrast', 'gamma', 'dither', 'multicolor', 'paused'];
     }
 
@@ -170,7 +196,7 @@
       super();
       const root = this.attachShadow({ mode: 'open' });
       root.innerHTML = `<style>
-        :host { display: block; overflow: hidden; }
+        :host { display: block; overflow: hidden; aspect-ratio: 1; }
         canvas { display: block; width: 100%; height: 100%; }
       </style><canvas></canvas>`;
       this._canvas = root.querySelector('canvas');
@@ -202,6 +228,8 @@
           brightness: gl.getUniformLocation(this._progDown, 'uBrightness'),
           contrast: gl.getUniformLocation(this._progDown, 'uContrast'),
           gamma: gl.getUniformLocation(this._progDown, 'uGamma'),
+          srcAspect: gl.getUniformLocation(this._progDown, 'uSrcAspect'),
+          dstAspect: gl.getUniformLocation(this._progDown, 'uDstAspect'),
         },
         main: {
           cells: gl.getUniformLocation(this._progMain, 'uCells'),
@@ -211,6 +239,9 @@
           bg: gl.getUniformLocation(this._progMain, 'uBg'),
           multicolor: gl.getUniformLocation(this._progMain, 'uMulticolor'),
           dither: gl.getUniformLocation(this._progMain, 'uDither'),
+          shape: gl.getUniformLocation(this._progMain, 'uShape'),
+          threshold: gl.getUniformLocation(this._progMain, 'uThreshold'),
+          markScale: gl.getUniformLocation(this._progMain, 'uMarkScale'),
           time: gl.getUniformLocation(this._progMain, 'uTime'),
         },
       };
@@ -272,6 +303,22 @@
     play() { this.removeAttribute('paused'); }
     pause() { this.setAttribute('paused', ''); }
 
+    /** Capture the current full-resolution WebGL frame as an image Blob. */
+    snapshot(type = 'image/png', quality) {
+      return new Promise((resolve, reject) => {
+        if (!this._gl || !this._media) {
+          reject(new Error('halftone-fx: no source is ready to capture'));
+          return;
+        }
+        this._render(performance.now() / 1000);
+        this._gl.finish();
+        this._canvas.toBlob(blob => {
+          if (blob) resolve(blob);
+          else reject(new Error('halftone-fx: snapshot failed'));
+        }, type, quality);
+      });
+    }
+
     // --- internals -----------------------------------------------------
 
     _loadSrc(url) {
@@ -312,7 +359,7 @@
 
     _gridPx() {
       const dpr = window.devicePixelRatio || 1;
-      const g = parseFloat(this.getAttribute('grid')) || 14;
+      const g = parseFloat(this.getAttribute('grid')) || 80;
       return Math.max(3, g) * dpr;
     }
 
@@ -386,13 +433,18 @@
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this._srcTex);
       gl.uniform1i(this._u.down.src, 0);
-      gl.uniform1f(this._u.down.brightness, (parseFloat(this.getAttribute('brightness')) || 0) / 255);
+      const brightness = parseFloat(this.getAttribute('brightness'));
+      gl.uniform1f(this._u.down.brightness, (Number.isFinite(brightness) ? brightness : 12) / 255);
       const c = parseFloat(this.getAttribute('contrast')) || 0;
       gl.uniform1f(this._u.down.contrast, (259 * (c + 255)) / (255 * (259 - c)));
       gl.uniform1f(this._u.down.gamma, parseFloat(this.getAttribute('gamma')) || 1);
+      const srcW = media.videoWidth || media.naturalWidth || media.width || 1;
+      const srcH = media.videoHeight || media.naturalHeight || media.height || 1;
+      gl.uniform1f(this._u.down.srcAspect, srcW / srcH);
+      gl.uniform1f(this._u.down.dstAspect, this._canvas.width / this._canvas.height);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-      // Pass 2: dots.
+      // Pass 2: shikaku marks.
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, this._canvas.width, this._canvas.height);
       gl.useProgram(this._progMain);
@@ -401,11 +453,18 @@
       gl.uniform1i(this._u.main.cells, 0);
       gl.uniform1f(this._u.main.grid, this._gridPx());
       gl.uniform2i(this._u.main.cellDims, this._cellW, this._cellH);
-      gl.uniform3fv(this._u.main.dotColor, hexToRgba(this.getAttribute('dot-color'), [0, 0, 0, 1]).slice(0, 3));
-      gl.uniform4fv(this._u.main.bg, hexToRgba(this.getAttribute('background'), [1, 1, 1, 1]));
+      gl.uniform3fv(this._u.main.dotColor, hexToRgba(this.getAttribute('dot-color'), [1, 49 / 255, 16 / 255, 1]).slice(0, 3));
+      gl.uniform4fv(this._u.main.bg, hexToRgba(this.getAttribute('background'), [0, 0, 0, 0]));
       gl.uniform1i(this._u.main.multicolor, this.hasAttribute('multicolor') ? 1 : 0);
       const DITHER_CODES = { none: 0, bayer: 1, bayer4: 1, bayer8: 2, grain: 3, noise: 4 };
       gl.uniform1i(this._u.main.dither, DITHER_CODES[this.getAttribute('dither')] || 0);
+      gl.uniform1i(this._u.main.shape, this.getAttribute('shape') === 'circle' ? 1 : 0);
+      const threshold = parseFloat(this.getAttribute('threshold'));
+      gl.uniform1f(this._u.main.threshold,
+        Math.min(100, Math.max(0, Number.isFinite(threshold) ? threshold : 50)) / 100);
+      const markSize = parseFloat(this.getAttribute('mark-size'));
+      gl.uniform1f(this._u.main.markScale,
+        Math.min(100, Math.max(0, Number.isFinite(markSize) ? markSize : 42)) / 100);
       gl.uniform1f(this._u.main.time, time || 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
