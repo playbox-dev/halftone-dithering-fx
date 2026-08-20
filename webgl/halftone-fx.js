@@ -513,7 +513,7 @@
       const speed = Math.min(100, Math.max(0,
         Number.isFinite(rawSpeed) ? rawSpeed : (legacy ? legacyValue : 35))) / 100;
       const rawSeed = parseInt(this.getAttribute('seed'), 10);
-      const seed = Number.isFinite(rawSeed) ? rawSeed >>> 0 : (legacy ? 1 : 0);
+      const seed = legacy ? (Number.isFinite(rawSeed) ? rawSeed >>> 0 : 1) : 0;
       return { code, amount, speed, seed, legacy };
     }
 
