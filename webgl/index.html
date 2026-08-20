@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>mimono shikaku — square halftone playground</title>
+  <title>mimono halftone playground</title>
   <style>
     :root {
       --base-gray: #f3f3f3;
@@ -23,7 +23,7 @@
       color: var(--ink);
     }
 
-    /* Shikaku means both square (四角) and visual (視覚): keep the stage 1:1. */
+    /* Keep the stage 1:1 so the default artwork stays geometrically balanced. */
     .hero {
       position: relative;
       width: min(100vw, 100vh);
@@ -145,7 +145,7 @@
 
   <section class="hero checker">
     <halftone-fx id="fx"
-      src="./assets/mimono-circle.jpeg"
+      src="./assets/mimono-circle.png"
       grid="80"
       shape="square"
       threshold="50"
@@ -155,15 +155,15 @@
       background="transparent"></halftone-fx>
   </section>
 
-  <div class="brand-lockup" aria-label="mimono shikaku">
+  <div class="brand-lockup" aria-label="mimono">
     <span class="brand-name">mimono</span>
-    <span class="brand-concept">shikaku / 四角・視覚</span>
+    <span class="brand-concept">square halftone</span>
   </div>
 
   <div class="panel">
     <label for="srcSelect">Source</label>
     <select id="srcSelect">
-      <option value="./assets/mimono-circle.jpeg" selected>mimono-circle.jpeg</option>
+      <option value="./assets/mimono-circle.png" selected>mimono-circle.png</option>
       <option value="./assets/demo.mp4">demo.mp4</option>
       <option value="./assets/horse.mp4">horse.mp4</option>
     </select>
@@ -206,7 +206,7 @@
 
     <label for="shape">Shape</label>
     <select id="shape">
-      <option value="square" selected>Square / 四角</option>
+      <option value="square" selected>Square</option>
       <option value="circle">Circle (legacy)</option>
     </select>
 
@@ -266,7 +266,7 @@
     });
 
     // Track what's playing so Export iframe can reference it by URL.
-    let currentSrc = './assets/mimono-circle.jpeg';
+    let currentSrc = './assets/mimono-circle.png';
 
     document.getElementById('srcSelect').addEventListener('change', e => {
       currentSrc = e.target.value;
@@ -293,8 +293,8 @@
           .map(o => o.value.slice('./assets/'.length));
         const names = [...new Set([...bundledNames, ...repoNames])];
         names.sort((a, b) => {
-          if (a === 'mimono-circle.jpeg') return -1;
-          if (b === 'mimono-circle.jpeg') return 1;
+          if (a === 'mimono-circle.png') return -1;
+          if (b === 'mimono-circle.png') return 1;
           return a.localeCompare(b);
         });
         // Keep uploaded entries (absolute URLs) — repo-asset options are rebuilt.
@@ -314,8 +314,8 @@
             ? currentSrc.slice('./assets/'.length) : '';
           sel.value = currentName && names.includes(currentName)
             ? currentSrc
-            : names.includes('mimono-circle.jpeg')
-              ? './assets/mimono-circle.jpeg' : './assets/' + names[0];
+            : names.includes('mimono-circle.png')
+              ? './assets/mimono-circle.png' : './assets/' + names[0];
           if (sel.value !== currentSrc) sel.dispatchEvent(new Event('change'));
         }
       } catch { /* offline — built-in options remain */ }
@@ -392,7 +392,7 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'mimono-shikaku.png';
+        link.download = 'mimono-halftone.png';
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -409,7 +409,7 @@
 
     // --- Export iframe ---
     // Emits only params that differ from embed.html's defaults, so URLs stay short.
-    const EMBED_DEFAULTS = { src: './assets/mimono-circle.jpeg', grid: '80', shape: 'square',
+    const EMBED_DEFAULTS = { src: './assets/mimono-circle.png', grid: '80', shape: 'square',
                              size: '42', threshold: '50', dot: 'ff3110', bg: 'transparent', brightness: '12',
                              contrast: '0', gamma: '1', dither: 'none' };
     const CANONICAL_EMBED = 'https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html';
@@ -439,7 +439,7 @@
       const q = p.toString().replace(/=(?=&|$)/g, '').replace(/%2F/gi, '/');
       return `<iframe src="${base}${q ? '?' + q : ''}"\n` +
              `        style="width:100%;aspect-ratio:1/1;display:block;border:0;pointer-events:none"\n` +
-             `        allow="autoplay" loading="lazy" title="mimono shikaku visual"></iframe>`;
+             `        allow="autoplay" loading="lazy" title="mimono halftone visual"></iframe>`;
     }
 
     const exportBtn = document.getElementById('exportIframe');

@@ -1,5 +1,5 @@
 /*
- * <halftone-fx> — crisp, GPU-accelerated shikaku halftone as a drop-in custom element.
+ * <halftone-fx> — crisp, GPU-accelerated square halftone as a drop-in custom element.
  *
  * Usage:
  *   <script src="halftone-fx.js"></script>
@@ -74,7 +74,7 @@
   const FS_MAIN = `#version 300 es
   precision highp float;
   uniform sampler2D uCells;
-  uniform float uGrid;        // device px per cell
+  uniform vec2 uCellSize;     // fitted device px per cell; tiles the canvas exactly
   uniform ivec2 uCellDims;
   uniform vec3 uDotColor;
   uniform vec4 uBg;
@@ -118,7 +118,7 @@
 
   void main() {
     vec2 fc = gl_FragCoord.xy;
-    ivec2 cell = clamp(ivec2(floor(fc / uGrid)), ivec2(0), uCellDims - 1);
+    ivec2 cell = clamp(ivec2(floor(fc / uCellSize)), ivec2(0), uCellDims - 1);
     float v = texelFetch(uCells, cell, 0).r;
 
     if (uDither == 1) {
@@ -134,8 +134,8 @@
     }
 
     float markSize = 1.0 - v;
-    float halfSize = uGrid * 0.5 * markSize * uMarkScale;
-    vec2 center = (vec2(cell) + 0.5) * uGrid;
+    float halfSize = min(uCellSize.x, uCellSize.y) * 0.5 * markSize * uMarkScale;
+    vec2 center = (vec2(cell) + 0.5) * uCellSize;
     vec2 delta = abs(fc - center);
     float d = uShape == 1 ? length(delta) : max(delta.x, delta.y);
     float m;
@@ -233,7 +233,7 @@
         },
         main: {
           cells: gl.getUniformLocation(this._progMain, 'uCells'),
-          grid: gl.getUniformLocation(this._progMain, 'uGrid'),
+          cellSize: gl.getUniformLocation(this._progMain, 'uCellSize'),
           cellDims: gl.getUniformLocation(this._progMain, 'uCellDims'),
           dotColor: gl.getUniformLocation(this._progMain, 'uDotColor'),
           bg: gl.getUniformLocation(this._progMain, 'uBg'),
@@ -444,14 +444,16 @@
       gl.uniform1f(this._u.down.dstAspect, this._canvas.width / this._canvas.height);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-      // Pass 2: shikaku marks.
+      // Pass 2: evenly fitted marks. Exact tiling keeps opposite edges symmetric.
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, this._canvas.width, this._canvas.height);
       gl.useProgram(this._progMain);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, this._cellTex);
       gl.uniform1i(this._u.main.cells, 0);
-      gl.uniform1f(this._u.main.grid, this._gridPx());
+      gl.uniform2f(this._u.main.cellSize,
+        this._canvas.width / this._cellW,
+        this._canvas.height / this._cellH);
       gl.uniform2i(this._u.main.cellDims, this._cellW, this._cellH);
       gl.uniform3fv(this._u.main.dotColor, hexToRgba(this.getAttribute('dot-color'), [1, 49 / 255, 16 / 255, 1]).slice(0, 3));
       gl.uniform4fv(this._u.main.bg, hexToRgba(this.getAttribute('background'), [0, 0, 0, 0]));

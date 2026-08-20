@@ -1,6 +1,6 @@
-# mimono shikaku
+# mimono halftone
 
-A browser-based halftone / dithering effect generator, reworked for mimono around the Japanese wordplay **shikaku**: 四角 (square) and 視覚 (visual). The WebGL experience defaults to square marks inside a square frame; the original circle treatment remains available with `shape="circle"`.
+A browser-based halftone / dithering effect generator reworked for mimono. The WebGL experience defaults to square marks inside a square frame; the original circle treatment remains available with `shape="circle"`.
 
 No build step, no dependencies — just static HTML/CSS/JS.
 
@@ -57,7 +57,7 @@ Params: `src` (media URL; add `type=video` for extension-less video URLs), `grid
 ```html
 <iframe src="https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html"
         style="width:100%;aspect-ratio:1/1;display:block;border:0;pointer-events:none"
-        allow="autoplay" loading="lazy" title="mimono shikaku visual"></iframe>
+        allow="autoplay" loading="lazy" title="mimono halftone visual"></iframe>
 ```
 
 `pointer-events:none` lets clicks/scroll pass through when it's used as a background layer; drop it if the embed should be interactive.
