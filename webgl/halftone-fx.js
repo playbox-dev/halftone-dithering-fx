@@ -360,7 +360,7 @@
     _gridPx() {
       const dpr = window.devicePixelRatio || 1;
       const g = parseFloat(this.getAttribute('grid')) || 80;
-      return Math.max(3, g) * dpr;
+      return Math.max(1, g) * dpr;
     }
 
     _resize() {
@@ -374,8 +374,9 @@
         this._canvas.height = h;
       }
       const grid = this._gridPx();
-      const cw = Math.max(1, Math.ceil(w / grid));
-      const ch = Math.max(1, Math.ceil(h / grid));
+      const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+      const cw = Math.min(maxTex, Math.max(1, Math.ceil(w / grid)));
+      const ch = Math.min(maxTex, Math.max(1, Math.ceil(h / grid)));
       if (cw !== this._cellW || ch !== this._cellH) {
         this._cellW = cw;
         this._cellH = ch;

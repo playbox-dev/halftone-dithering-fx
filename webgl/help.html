@@ -74,7 +74,8 @@
   <ol>
     <li>Open the <a href="./index.html">playground</a>.</li>
     <li>Pick a clip from <strong>Source</strong> (the list mirrors this repo's
-        <code>webgl/assets/</code> folder) and tune the sliders until it looks right.</li>
+        <code>webgl/assets/</code> folder), choose a <strong>Look</strong> preset, then tune
+        any slider until it looks right.</li>
     <li>Click <strong>⬇ Download PNG</strong> for a full-resolution still with transparency,
         or <strong>📋 Export iframe</strong> for the live version.</li>
     <li>Use the PNG directly, or paste the iframe into your site builder's embed/HTML element.</li>
@@ -112,7 +113,7 @@
   <table>
     <tr><th>Param</th><th>Values</th><th>Meaning</th></tr>
     <tr><td><code>src</code></td><td>URL</td><td>Image or video. Relative (<code>./assets/…</code>) or any CORS-accessible absolute URL. Add <code>type=video</code> for video URLs without a file extension.</td></tr>
-    <tr><td><code>grid</code></td><td>8–160</td><td>Halftone cell size in px. Larger = fewer marks. Default 80.</td></tr>
+    <tr><td><code>grid</code></td><td>1–320 in the playground</td><td>Halftone cell size in px. Smaller = more detail; larger = fewer marks. Default 80.</td></tr>
     <tr><td><code>shape</code></td><td><code>square</code> / <code>circle</code></td><td>Mark geometry. Default <code>square</code>; <code>circle</code> preserves the legacy look.</td></tr>
     <tr><td><code>size</code></td><td>0–100</td><td>Maximum mark size within each cell. Lower values create more space between squares. Default 42.</td></tr>
     <tr><td><code>threshold</code></td><td>0–100</td><td>Hides marks smaller than this percentage. Raise it to remove small peripheral squares. Default 50.</td></tr>
@@ -125,9 +126,10 @@
     <tr><td><code>multicolor</code></td><td>flag</td><td>Rainbow marks colored by brightness.</td></tr>
   </table>
   <div class="tip">
-    <strong>Sparse mimono logo preset:</strong> <code>grid=80</code>, <code>size=42</code>,
-    <code>threshold=50</code>, <code>brightness=12</code>. Grid controls how many squares
-    appear; size controls the gap between them.
+    <strong>Three useful starting points:</strong> Sparse keeps the mimono logo treatment;
+    High detail uses tiny variable-size squares to preserve image structure; Artistic grain
+    turns tone into a stable stipple field. Presets only move the controls—you can keep
+    editing every value afterward.
   </div>
 
   <h2 id="assets">Adding your own image / video</h2>

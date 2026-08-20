@@ -172,12 +172,20 @@
     <button class="upload-btn" id="uploadBtn" type="button">⬆️ Upload your own media</button>
     <input type="file" id="uploadInput" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime" hidden>
 
+    <label for="preset">Look</label>
+    <select id="preset">
+      <option value="custom">Custom</option>
+      <option value="sparse" selected>Sparse</option>
+      <option value="detail">High detail</option>
+      <option value="artistic">Artistic grain</option>
+    </select>
+
     <label for="grid">Grid</label>
-    <input type="range" id="grid" min="8" max="160" value="80">
+    <input type="range" id="grid" min="1" max="320" value="80">
     <output id="gridOut">80</output>
 
     <label for="markSize">Mark size</label>
-    <input type="range" id="markSize" min="5" max="100" value="42">
+    <input type="range" id="markSize" min="1" max="100" value="42">
     <output id="markSizeOut">42</output>
 
     <label for="brightness">Bright</label>
@@ -236,12 +244,15 @@
   <script src="./halftone-fx.js"></script>
   <script>
     const fx = document.getElementById('fx');
+    const presetSelect = document.getElementById('preset');
+    let applyingPreset = false;
     const bind = (id, attr) => {
       const el = document.getElementById(id);
       const out = document.getElementById(id + 'Out');
       el.addEventListener('input', () => {
         fx.setAttribute(attr, el.value);
         if (out) out.textContent = el.value;
+        if (!applyingPreset) presetSelect.value = 'custom';
       });
     };
     bind('grid', 'grid');
@@ -254,6 +265,23 @@
     bind('shape', 'shape');
     bind('dotColor', 'dot-color');
     bind('bgColor', 'background');
+
+    const PRESETS = {
+      sparse:   { grid: 80, markSize: 42, brightness: 12, threshold: 50, contrast: 0,  gamma: 1, dither: 'none' },
+      detail:   { grid: 3,  markSize: 78, brightness: 0,  threshold: 0,  contrast: 10, gamma: 1, dither: 'none' },
+      artistic: { grid: 3,  markSize: 55, brightness: 20, threshold: 0,  contrast: 15, gamma: 1, dither: 'grain' },
+    };
+    presetSelect.addEventListener('change', () => {
+      const values = PRESETS[presetSelect.value];
+      if (!values) return;
+      applyingPreset = true;
+      for (const [id, value] of Object.entries(values)) {
+        const el = document.getElementById(id);
+        el.value = value;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      applyingPreset = false;
+    });
 
     document.getElementById('multicolor').addEventListener('change', e => {
       e.target.checked ? fx.setAttribute('multicolor', '') : fx.removeAttribute('multicolor');

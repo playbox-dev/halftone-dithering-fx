@@ -67,6 +67,7 @@ Params: `src` (media URL; add `type=video` for extension-less video URLs), `grid
 ## Features
 
 - Live preview for images **and** video (frame-by-frame)
+- Sparse, high-detail, and artistic-grain starting presets, plus a wide 1–320 px grid range
 - Adjustable grid size, mark spacing, minimum-size threshold, brightness, contrast, gamma, and smoothing
 - Multiple dithering algorithms: Floyd–Steinberg, Jarvis-Judice-Ninke, Stucki, Burkes, Ordered (Bayer), Noise, or none
 - Square or circle marks, custom mark/background colors, and rainbow multicolor mode
