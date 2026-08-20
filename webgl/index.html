@@ -110,26 +110,6 @@
     .panel .upload-btn:hover { border-color: var(--play-red); color: var(--text-red); }
     .panel .upload-btn:disabled { cursor: wait; opacity: 0.6; }
     .panel .upload-btn.error { border-color: #a00; color: #a00; }
-    .panel .overdrive-row {
-      grid-column: 1 / 4;
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: 9px;
-      align-items: center;
-      padding: 9px 10px;
-      border: 1px solid var(--ink);
-      background: var(--ink);
-      color: #fff;
-    }
-    .panel .overdrive-row label { display: grid; gap: 2px; color: #fff; cursor: pointer; }
-    .panel .overdrive-row small { color: #aaa; font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase; }
-    .panel .overdrive-row button {
-      border: 1px solid var(--play-red); border-radius: 0; padding: 5px 7px;
-      background: transparent; color: var(--play-red); font: inherit; font-weight: 700; cursor: pointer;
-    }
-    .panel .overdrive-row.active { background: var(--play-red); color: var(--ink); }
-    .panel .overdrive-row.active label, .panel .overdrive-row.active small { color: var(--ink); }
-    .panel .overdrive-row.active button { border-color: var(--ink); color: var(--ink); }
     .panel input[type="range"]:disabled { opacity: 0.35; }
     @media (min-width: 601px) and (max-height: 520px) {
       .panel { max-height: calc(100vh - 32px); overflow-y: auto; }
@@ -197,13 +177,12 @@
     <select id="preset">
       <option value="custom">Custom</option>
       <option value="sparse" selected>Sparse</option>
-      <option value="detail">High detail</option>
-      <option value="artistic">Artistic grain</option>
-      <option value="newsprint">Newsprint</option>
-      <option value="constellation">Constellation</option>
-      <option value="softfield">Soft field</option>
-      <option value="hardcontrast">Hard contrast</option>
-      <option value="mosaic">Mosaic</option>
+      <option value="detail">Detail</option>
+      <option value="grain">Grain</option>
+      <option value="bayer4">Bayer 4&times;4</option>
+      <option value="bayer8">Bayer 8&times;8</option>
+      <option value="poster">Poster</option>
+      <option value="blocks">Blocks</option>
     </select>
 
     <label for="grid">Grid</label>
@@ -261,18 +240,23 @@
       <label for="multicolor">Multicolor marks</label>
     </div>
 
-    <div class="overdrive-row" id="overdriveRow">
-      <input type="checkbox" id="overdrive">
-      <label for="overdrive">
-        <strong>Creative Overdrive</strong>
-        <small>Infinite seeded evolution</small>
-      </label>
-      <button type="button" id="mutateOverdrive" title="Generate a new deterministic variation">↯ Mutate</button>
-    </div>
+    <label for="motion">Motion</label>
+    <select id="motion">
+      <option value="off" selected>Off</option>
+      <option value="pulse">Pulse</option>
+      <option value="radial">Radial</option>
+      <option value="sweep">Sweep</option>
+      <option value="interference">Interference</option>
+      <option value="scan">Scan</option>
+    </select>
 
-    <label for="flux">Flux</label>
-    <input type="range" id="flux" min="1" max="10" value="5" disabled>
-    <output id="fluxOut">5</output>
+    <label for="amount">Amount</label>
+    <input type="range" id="amount" min="0" max="100" value="35" disabled>
+    <output id="amountOut">35</output>
+
+    <label for="speed">Speed</label>
+    <input type="range" id="speed" min="0" max="100" value="35" disabled>
+    <output id="speedOut">35</output>
 
     <button class="export-btn" id="downloadPng">⬇ Download PNG</button>
     <button class="export-btn embed-btn" id="exportIframe">📋 Export iframe (copy embed code)</button>
@@ -284,22 +268,22 @@
   <script>
     const fx = document.getElementById('fx');
     const presetSelect = document.getElementById('preset');
-    const overdriveToggle = document.getElementById('overdrive');
-    const overdriveRow = document.getElementById('overdriveRow');
-    const fluxInput = document.getElementById('flux');
-    const fluxOut = document.getElementById('fluxOut');
+    const motionInput = document.getElementById('motion');
+    const amountInput = document.getElementById('amount');
+    const speedInput = document.getElementById('speed');
     let applyingPreset = false;
 
-    function setOverdrive(enabled) {
-      overdriveToggle.checked = enabled;
-      fluxInput.disabled = !enabled;
-      overdriveRow.classList.toggle('active', enabled);
-      if (enabled) {
-        if (!fx.hasAttribute('seed')) fx.setAttribute('seed', String(randomSeed()));
-        fx.setAttribute('flux', fluxInput.value);
-        fx.setAttribute('overdrive', '');
+    function setMotion(mode) {
+      const active = mode !== 'off';
+      motionInput.value = mode;
+      amountInput.disabled = !active;
+      speedInput.disabled = !active;
+      if (active) {
+        fx.setAttribute('motion', mode);
+        fx.setAttribute('amount', amountInput.value);
+        fx.setAttribute('speed', speedInput.value);
       } else {
-        fx.removeAttribute('overdrive');
+        fx.removeAttribute('motion');
       }
     }
 
@@ -311,7 +295,6 @@
         if (out) out.textContent = el.value;
         if (!applyingPreset) {
           presetSelect.value = 'custom';
-          if (overdriveToggle.checked) setOverdrive(false);
         }
       });
     };
@@ -327,19 +310,17 @@
     bind('bgColor', 'background');
 
     const PRESETS = {
-      sparse:        { grid: 80, markSize: 42, brightness: 12, threshold: 50, contrast: 0,  gamma: 1,   dither: 'none',   shape: 'square', multicolor: false },
-      detail:        { grid: 3,  markSize: 78, brightness: 0,  threshold: 0,  contrast: 10, gamma: 1,   dither: 'none',   shape: 'square', multicolor: false },
-      artistic:      { grid: 3,  markSize: 55, brightness: 20, threshold: 0,  contrast: 15, gamma: 1,   dither: 'grain',  shape: 'square', multicolor: false },
-      newsprint:     { grid: 6,  markSize: 82, brightness: 6,  threshold: 0,  contrast: 38, gamma: 0.9, dither: 'bayer4', shape: 'square', multicolor: false },
-      constellation: { grid: 5,  markSize: 38, brightness: 26, threshold: 0,  contrast: 26, gamma: 1.2, dither: 'grain',  shape: 'square', multicolor: false },
-      softfield:     { grid: 11, markSize: 72, brightness: 18, threshold: 4,  contrast: -8, gamma: 1.6, dither: 'none',   shape: 'square', multicolor: false },
-      hardcontrast:  { grid: 4,  markSize: 90, brightness: -4, threshold: 3,  contrast: 58, gamma: 0.8, dither: 'bayer8', shape: 'square', multicolor: false },
-      mosaic:        { grid: 28, markSize: 92, brightness: 0,  threshold: 12, contrast: 34, gamma: 0.9, dither: 'none',   shape: 'square', multicolor: false },
+      sparse: { grid: 80, markSize: 42,  brightness: 12, threshold: 50, contrast: 0,  gamma: 1,   dither: 'none',   shape: 'square', multicolor: false },
+      detail: { grid: 3,  markSize: 78,  brightness: 0,  threshold: 0,  contrast: 10, gamma: 1,   dither: 'none',   shape: 'square', multicolor: false },
+      grain:  { grid: 3,  markSize: 55,  brightness: 20, threshold: 0,  contrast: 15, gamma: 1,   dither: 'grain',  shape: 'square', multicolor: false },
+      bayer4: { grid: 6,  markSize: 82,  brightness: 6,  threshold: 0,  contrast: 38, gamma: 0.9, dither: 'bayer4', shape: 'square', multicolor: false },
+      bayer8: { grid: 4,  markSize: 86,  brightness: 2,  threshold: 0,  contrast: 46, gamma: 0.9, dither: 'bayer8', shape: 'square', multicolor: false },
+      poster: { grid: 8,  markSize: 100, brightness: -5, threshold: 24, contrast: 65, gamma: 0.8, dither: 'none',   shape: 'square', multicolor: false },
+      blocks: { grid: 28, markSize: 92,  brightness: 0,  threshold: 12, contrast: 34, gamma: 0.9, dither: 'none',   shape: 'square', multicolor: false },
     };
     presetSelect.addEventListener('change', () => {
       const values = PRESETS[presetSelect.value];
       if (!values) return;
-      setOverdrive(false);
       applyingPreset = true;
       for (const [id, value] of Object.entries(values)) {
         if (id === 'multicolor') {
@@ -360,20 +341,14 @@
       if (!applyingPreset) presetSelect.value = 'custom';
     });
 
-    function randomSeed() {
-      const values = new Uint32Array(1);
-      crypto.getRandomValues(values);
-      return values[0] || 1;
-    }
-
-    overdriveToggle.addEventListener('change', () => setOverdrive(overdriveToggle.checked));
-    fluxInput.addEventListener('input', () => {
-      fluxOut.textContent = fluxInput.value;
-      fx.setAttribute('flux', fluxInput.value);
+    motionInput.addEventListener('change', () => setMotion(motionInput.value));
+    amountInput.addEventListener('input', () => {
+      document.getElementById('amountOut').textContent = amountInput.value;
+      fx.setAttribute('amount', amountInput.value);
     });
-    document.getElementById('mutateOverdrive').addEventListener('click', () => {
-      fx.setAttribute('seed', String(randomSeed()));
-      setOverdrive(true);
+    speedInput.addEventListener('input', () => {
+      document.getElementById('speedOut').textContent = speedInput.value;
+      fx.setAttribute('speed', speedInput.value);
     });
 
     const bgColorInput = document.getElementById('bgColor');
@@ -554,10 +529,11 @@
         if (v !== EMBED_DEFAULTS[k]) p.set(k, v);
       }
       if (document.getElementById('multicolor').checked) p.set('multicolor', '');
-      if (overdriveToggle.checked) {
-        p.set('overdrive', '1');
-        p.set('flux', fluxInput.value);
-        p.set('seed', fx.getAttribute('seed') || '1');
+      if (motionInput.value !== 'off') {
+        p.set('motion', motionInput.value);
+        p.set('amount', amountInput.value);
+        p.set('speed', speedInput.value);
+        p.set('phase', fx.motionPhase.toFixed(4));
       }
       const q = p.toString().replace(/=(?=&|$)/g, '').replace(/%2F/gi, '/');
       return `<iframe src="${base}${q ? '?' + q : ''}"\n` +

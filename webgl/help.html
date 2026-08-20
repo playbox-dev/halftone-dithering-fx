@@ -59,7 +59,7 @@
     <a href="#params">URL params</a>
     <a href="#assets">Adding assets</a>
     <a href="#dither">Dither modes</a>
-    <a href="#overdrive">Overdrive</a>
+    <a href="#motion">Motion</a>
     <a href="#faq">FAQ</a>
   </nav>
 
@@ -125,15 +125,15 @@
     <tr><td><code>gamma</code></td><td>0.1–3</td><td>Default 1.</td></tr>
     <tr><td><code>dither</code></td><td><code>none</code> <code>bayer4</code> <code>bayer8</code> <code>grain</code> <code>noise</code></td><td>See <a href="#dither">dither modes</a>. Default none.</td></tr>
     <tr><td><code>multicolor</code></td><td>flag</td><td>Rainbow marks colored by brightness.</td></tr>
-    <tr><td><code>overdrive</code></td><td>flag</td><td>Continuously evolves tone, mark scale, threshold, and a spatial wave field.</td></tr>
-    <tr><td><code>flux</code></td><td>1–10</td><td>Overdrive energy and speed. Default 5.</td></tr>
-    <tr><td><code>seed</code></td><td>integer</td><td>Selects a deterministic Overdrive variation. Reuse a seed to reuse its motion character.</td></tr>
+    <tr><td><code>motion</code></td><td><code>pulse</code> <code>radial</code> <code>sweep</code> <code>interference</code> <code>scan</code></td><td>A symmetric mark-size field. Omit it for no motion.</td></tr>
+    <tr><td><code>amount</code></td><td>0–100</td><td>How strongly the field resizes marks. Default 35.</td></tr>
+    <tr><td><code>speed</code></td><td>0–100</td><td>Motion rate. Zero freezes the current field. Default 35.</td></tr>
+    <tr><td><code>phase</code></td><td>radians</td><td>Starting pose. Added automatically by the iframe exporter so a frozen field round-trips exactly.</td></tr>
   </table>
   <div class="tip">
-    <strong>Preset spectrum:</strong> Sparse, High detail, Artistic grain, Newsprint,
-    Constellation, Soft field, Hard contrast, and Mosaic cover everything from a few huge
-    marks to dense editorial stippling. Presets only move the controls—you can keep editing
-    every value afterward.
+    <strong>Looks:</strong> Sparse, Detail, Grain, Bayer 4×4, Bayer 8×8, Poster, and Blocks
+    are literal starting points for different rendering processes. Motion is independent,
+    so changing a look does not turn it off.
   </div>
 
   <h2 id="assets">Adding your own image / video</h2>
@@ -171,21 +171,24 @@
      they're sequential (can't run on a GPU shader) and they shimmer on video. They live in
      the <a href="../index.html">classic export tool</a> for still images.</p>
 
-  <h2 id="overdrive">Creative Overdrive</h2>
-  <p>Creative Overdrive turns any fixed look into a continuously evolving generative one.
-     It modulates brightness, contrast, gamma, threshold, mark scale, and a smooth spatial
-     wave field directly in the GPU component. It never reallocates the halftone grid while
-     running, so even dense looks stay fast.</p>
-  <ul>
-    <li><strong>Flux</strong> controls both energy and speed, from a slow drift at 1 to a
-        faster transformation at 10.</li>
-    <li><strong>Mutate</strong> creates a fresh seed. The exported iframe includes that seed,
-        so the same generative character survives outside the playground.</li>
-    <li>Choose any preset first to define the base density, then enable Overdrive.</li>
-    <li>When reduced motion is enabled in the operating system, Overdrive renders a static
-        seeded variation instead of animating.</li>
-  </ul>
-  <pre><code>embed.html?src=./assets/horse.mp4&amp;grid=3&amp;dither=grain&amp;overdrive=1&amp;flux=7&amp;seed=42</code></pre>
+  <h2 id="motion">Motion fields</h2>
+  <p>Motion changes mark size only. It does not change the source tone, grid, color, or
+     threshold. Every field uses normalized mirrored coordinates, so it keeps the same
+     geometry at sparse and detailed grid settings and keeps the field itself vertically and
+     horizontally symmetric.</p>
+  <table>
+    <tr><th>Mode</th><th>Movement</th></tr>
+    <tr><td><code>pulse</code></td><td>All marks expand and contract together.</td></tr>
+    <tr><td><code>radial</code></td><td>Concentric circular fronts move through the source.</td></tr>
+    <tr><td><code>sweep</code></td><td>A square front travels from the centre to the edge.</td></tr>
+    <tr><td><code>interference</code></td><td>Two perpendicular waves form a shifting lattice.</td></tr>
+    <tr><td><code>scan</code></td><td>A thin mirrored cross travels outwards and back.</td></tr>
+  </table>
+  <p><strong>Amount</strong> sets the resize depth and <strong>Speed</strong> sets the rate.
+     The operating system's reduced-motion setting disables the field and shows the untouched
+     look. Previously exported <code>overdrive</code>, <code>flux</code>, and <code>seed</code>
+     params remain accepted for compatibility.</p>
+  <pre><code>embed.html?src=./assets/horse.mp4&amp;grid=3&amp;dither=grain&amp;motion=radial&amp;amount=35&amp;speed=35</code></pre>
 
   <h2 id="perf">Performance</h2>
   <p>Measured head-to-head against the CPU original (same video, 1920×1080, Apple M2 Pro):

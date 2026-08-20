@@ -15,7 +15,7 @@
   <script>
     // Configure entirely via query params, e.g.:
     //   embed.html?grid=80&shape=square&size=42&threshold=50&dot=ff3110&bg=transparent
-    //   embed.html?src=https://your.cdn/clip.mp4&type=video&overdrive=1&flux=7&seed=42
+    //   embed.html?src=https://your.cdn/clip.mp4&type=video&motion=radial&amount=35&speed=35
     // Colors may omit the '#' (it can't appear raw in a URL).
     const p = new URLSearchParams(location.search);
     const fx = document.createElement('halftone-fx');
@@ -28,13 +28,18 @@
       dot: 'dot-color', dotcolor: 'dot-color', 'dot-color': 'dot-color',
       bg: 'background', background: 'background',
       brightness: 'brightness', contrast: 'contrast', gamma: 'gamma', dither: 'dither',
+      motion: 'motion', amount: 'amount', speed: 'speed', phase: 'phase',
+      // Deprecated, but kept so previously exported URLs still render.
       flux: 'flux', seed: 'seed',
     };
     for (const [param, attr] of Object.entries(ATTRS)) {
       if (p.has(param)) fx.setAttribute(attr, p.get(param));
     }
     if (p.has('multicolor')) fx.setAttribute('multicolor', '');
-    if (p.has('overdrive') && p.get('overdrive') !== '0') fx.setAttribute('overdrive', '');
+    const isEnabled = value => !['0', 'false', 'off', 'no'].includes((value || '').toLowerCase());
+    if (!p.has('motion') && p.has('overdrive') && isEnabled(p.get('overdrive'))) {
+      fx.setAttribute('overdrive', '');
+    }
 
     // Defaults: self-hosted circle artwork rendered with square marks.
     if (!fx.hasAttribute('src')) fx.setAttribute('src', './assets/mimono-circle.png');
