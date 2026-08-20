@@ -24,6 +24,9 @@
  *                  grain: interleaved gradient noise — blue-noise-like, stable, organic
  *                  noise: white noise re-seeded ~30fps — deliberate film-grain flicker
  *   multicolor   — present = rainbow marks by brightness
+ *   overdrive    — present = continuously evolve the look (seeded and deterministic)
+ *   flux         — overdrive energy/rate, 1..10 (default 5)
+ *   seed         — integer selecting an overdrive variation (default 1)
  *   paused       — present = freeze rendering
  *
  * JS API: el.play(), el.pause(), el.snapshot(), el.source = <img|video|canvas element>
@@ -83,6 +86,9 @@
   uniform int uShape;         // 0 square, 1 circle
   uniform float uThreshold;   // minimum normalized mark size
   uniform float uMarkScale;   // spacing: maximum fraction of each cell occupied
+  uniform int uOverdrive;     // 0/1: smooth generative modulation
+  uniform float uFlux;        // normalized overdrive intensity, 0..1
+  uniform float uSeed;        // deterministic variation seed
   uniform float uTime;
   out vec4 o;
 
@@ -119,21 +125,35 @@
   void main() {
     vec2 fc = gl_FragCoord.xy;
     ivec2 cell = clamp(ivec2(floor(fc / uCellSize)), ivec2(0), uCellDims - 1);
+    ivec2 patternCell = uOverdrive == 1 ? min(cell, uCellDims - 1 - cell) : cell;
     float v = texelFetch(uCells, cell, 0).r;
 
     if (uDither == 1) {
-      v = v < bayer4(cell) ? 0.0 : 1.0;
+      v = v < bayer4(patternCell) ? 0.0 : 1.0;
     } else if (uDither == 2) {
-      v = v < bayer8(cell) ? 0.0 : 1.0;
+      v = v < bayer8(patternCell) ? 0.0 : 1.0;
     } else if (uDither == 3) {
-      v = v < ign(vec2(cell)) ? 0.0 : 1.0;
+      v = v < ign(vec2(patternCell)) ? 0.0 : 1.0;
     } else if (uDither == 4) {
       // Animated grain, stepped at ~30fps like film.
-      float n = hash(vec2(cell) + floor(uTime * 30.0) * vec2(13.7, 7.3)) - 0.5;
+      float n = hash(vec2(patternCell) + floor(uTime * 30.0) * vec2(13.7, 7.3)) - 0.5;
       v = (v + n * 0.4) < 0.5 ? 0.0 : 1.0;
     }
 
     float markSize = 1.0 - v;
+    if (uOverdrive == 1) {
+      float rate = mix(0.22, 1.15, uFlux);
+      float phase = uTime * rate + uSeed * 0.017;
+      vec2 p = vec2(cell) + 0.5;
+      vec2 fieldCenter = vec2(uCellDims) * 0.5;
+      vec2 q = abs(p - fieldCenter);
+      float wave = 0.5
+        + 0.25 * sin(q.x * 0.31 + phase)
+        + 0.25 * cos(q.y * 0.27 - phase * 0.83);
+      float orbit = 0.5 + 0.5 * sin(length(q) * 0.45 - phase * 0.57);
+      float field = mix(wave, orbit, 0.35) - 0.5;
+      markSize = clamp(markSize + field * mix(0.18, 0.52, uFlux), 0.0, 1.0);
+    }
     float halfSize = min(uCellSize.x, uCellSize.y) * 0.5 * markSize * uMarkScale;
     vec2 center = (vec2(cell) + 0.5) * uCellSize;
     vec2 delta = abs(fc - center);
@@ -141,7 +161,7 @@
     float m;
     if (markSize < uThreshold || v >= 0.999) {
       m = 0.0; // Pure white must not leave a sub-pixel speck.
-    } else if (uShape == 0 && v <= 0.001 && uMarkScale >= 0.999) {
+    } else if (uOverdrive == 0 && uShape == 0 && v <= 0.001 && uMarkScale >= 0.999) {
       m = 1.0; // Full black squares tile cleanly without grid seams.
     } else {
       m = 1.0 - smoothstep(halfSize - 0.75, halfSize + 0.75, d);
@@ -184,12 +204,20 @@
     return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255, 1];
   }
 
+  function seedPhase(seed, channel) {
+    let x = ((seed >>> 0) + Math.imul(channel + 1, 0x9e3779b9)) >>> 0;
+    x ^= x >>> 16;
+    x = Math.imul(x, 0x7feb352d) >>> 0;
+    x ^= x >>> 15;
+    return (x / 4294967296) * Math.PI * 2;
+  }
+
   const VIDEO_RE = /\.(mp4|webm|ogv|mov|m4v)(\?|#|$)/i;
 
   class HalftoneFX extends HTMLElement {
     static get observedAttributes() {
       return ['src', 'type', 'grid', 'shape', 'threshold', 'mark-size', 'dot-color', 'background', 'brightness',
-              'contrast', 'gamma', 'dither', 'multicolor', 'paused'];
+              'contrast', 'gamma', 'dither', 'multicolor', 'overdrive', 'flux', 'seed', 'paused'];
     }
 
     constructor() {
@@ -203,10 +231,20 @@
       this._media = null;          // HTMLImageElement | HTMLVideoElement | canvas
       this._isVideo = false;
       this._raf = 0;
+      this._onceRaf = 0;
       this._visible = true;
       this._cellW = 0;
       this._cellH = 0;
       this._srcDirty = true;       // media needs (re)upload
+      this._overdriveEpoch = 0;
+      this._motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+      this._reduceMotion = this._motionQuery.matches;
+      this._onMotionChange = event => {
+        this._reduceMotion = event.matches;
+        this._overdriveEpoch = performance.now() / 1000;
+        this._requestRender();
+        this._syncLoop();
+      };
     }
 
     connectedCallback() {
@@ -218,6 +256,7 @@
         return;
       }
       this._gl = gl;
+      this._overdriveEpoch = performance.now() / 1000;
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
       this._progDown = program(gl, FS_DOWN);
@@ -242,6 +281,9 @@
           shape: gl.getUniformLocation(this._progMain, 'uShape'),
           threshold: gl.getUniformLocation(this._progMain, 'uThreshold'),
           markScale: gl.getUniformLocation(this._progMain, 'uMarkScale'),
+          overdrive: gl.getUniformLocation(this._progMain, 'uOverdrive'),
+          flux: gl.getUniformLocation(this._progMain, 'uFlux'),
+          seed: gl.getUniformLocation(this._progMain, 'uSeed'),
           time: gl.getUniformLocation(this._progMain, 'uTime'),
         },
       };
@@ -264,6 +306,7 @@
 
       this._ro = new ResizeObserver(() => this._resize());
       this._ro.observe(this);
+      this._motionQuery.addEventListener('change', this._onMotionChange);
       this._io = new IntersectionObserver(entries => {
         this._visible = entries[0].isIntersecting;
         this._syncLoop();
@@ -276,9 +319,12 @@
 
     disconnectedCallback() {
       cancelAnimationFrame(this._raf);
+      cancelAnimationFrame(this._onceRaf);
       this._raf = 0;
+      this._onceRaf = 0;
       if (this._ro) this._ro.disconnect();
       if (this._io) this._io.disconnect();
+      this._motionQuery.removeEventListener('change', this._onMotionChange);
       if (this._isVideo && this._media) this._media.pause();
     }
 
@@ -287,6 +333,7 @@
       if (name === 'src') this._loadSrc(value);
       else if (name === 'grid') this._resize();
       else this._requestRender();
+      if (name === 'overdrive' || name === 'seed') this._overdriveEpoch = performance.now() / 1000;
       this._syncLoop();
     }
 
@@ -388,12 +435,16 @@
 
     _animating() {
       if (this.hasAttribute('paused') || !this._visible || !this._media) return false;
-      return this._isVideo || this.getAttribute('dither') === 'noise';
+      const overdrive = this.hasAttribute('overdrive');
+      const animatedNoise = this.getAttribute('dither') === 'noise' && !(overdrive && this._reduceMotion);
+      return this._isVideo || animatedNoise || (overdrive && !this._reduceMotion);
     }
 
     _syncLoop() {
       if (this._animating()) {
         if (!this._raf) {
+          cancelAnimationFrame(this._onceRaf);
+          this._onceRaf = 0;
           const tick = (t) => {
             this._raf = this._animating() ? requestAnimationFrame(tick) : 0;
             this._render(t / 1000);
@@ -401,15 +452,20 @@
           this._raf = requestAnimationFrame(tick);
         }
       } else {
+        const wasAnimating = !!this._raf;
         cancelAnimationFrame(this._raf);
         this._raf = 0;
+        if (wasAnimating) this._requestRender();
       }
     }
 
     _requestRender() {
       // One-shot render for static states (loop handles animated ones).
-      if (this._raf || !this._gl || !this._media) return;
-      requestAnimationFrame(t => { if (!this._raf) this._render(t / 1000); });
+      if (this._raf || this._onceRaf || !this._gl || !this._media) return;
+      this._onceRaf = requestAnimationFrame(t => {
+        this._onceRaf = 0;
+        if (!this._raf) this._render(t / 1000);
+      });
     }
 
     _render(time) {
@@ -417,6 +473,17 @@
       const media = this._media;
       if (!gl || !media) return;
       if (this._isVideo && media.readyState < 2) return;
+
+      const overdrive = this.hasAttribute('overdrive');
+      const rawFlux = parseFloat(this.getAttribute('flux'));
+      const flux = Math.min(10, Math.max(1, Number.isFinite(rawFlux) ? rawFlux : 5)) / 10;
+      const rawSeed = parseInt(this.getAttribute('seed'), 10);
+      const seed = Number.isFinite(rawSeed) ? rawSeed >>> 0 : 1;
+      const effectTime = overdrive && !this._reduceMotion
+        ? Math.max(0, (time || 0) - this._overdriveEpoch)
+        : (overdrive ? 0 : (time || 0));
+      const drift = effectTime * (0.16 + flux * 0.5);
+      const signal = channel => Math.sin(drift * (1 + channel * 0.137) + seedPhase(seed, channel));
 
       // Upload source frame (every frame for video, once for images).
       if (this._isVideo || this._srcDirty) {
@@ -435,10 +502,21 @@
       gl.bindTexture(gl.TEXTURE_2D, this._srcTex);
       gl.uniform1i(this._u.down.src, 0);
       const brightness = parseFloat(this.getAttribute('brightness'));
-      gl.uniform1f(this._u.down.brightness, (Number.isFinite(brightness) ? brightness : 12) / 255);
-      const c = parseFloat(this.getAttribute('contrast')) || 0;
+      const baseBrightness = Number.isFinite(brightness) ? brightness : 12;
+      const effectiveBrightness = overdrive
+        ? Math.min(100, Math.max(-100, baseBrightness + signal(0) * (6 + flux * 22)))
+        : baseBrightness;
+      gl.uniform1f(this._u.down.brightness, effectiveBrightness / 255);
+      const baseContrast = parseFloat(this.getAttribute('contrast')) || 0;
+      const c = overdrive
+        ? Math.min(100, Math.max(-100, baseContrast + signal(1) * (10 + flux * 34)))
+        : baseContrast;
       gl.uniform1f(this._u.down.contrast, (259 * (c + 255)) / (255 * (259 - c)));
-      gl.uniform1f(this._u.down.gamma, parseFloat(this.getAttribute('gamma')) || 1);
+      const baseGamma = parseFloat(this.getAttribute('gamma')) || 1;
+      const effectiveGamma = overdrive
+        ? Math.min(3, Math.max(0.1, baseGamma + signal(2) * (0.12 + flux * 0.42)))
+        : baseGamma;
+      gl.uniform1f(this._u.down.gamma, effectiveGamma);
       const srcW = media.videoWidth || media.naturalWidth || media.width || 1;
       const srcH = media.videoHeight || media.naturalHeight || media.height || 1;
       gl.uniform1f(this._u.down.srcAspect, srcW / srcH);
@@ -463,12 +541,17 @@
       gl.uniform1i(this._u.main.dither, DITHER_CODES[this.getAttribute('dither')] || 0);
       gl.uniform1i(this._u.main.shape, this.getAttribute('shape') === 'circle' ? 1 : 0);
       const threshold = parseFloat(this.getAttribute('threshold'));
+      const baseThreshold = Math.min(100, Math.max(0, Number.isFinite(threshold) ? threshold : 50)) / 100;
       gl.uniform1f(this._u.main.threshold,
-        Math.min(100, Math.max(0, Number.isFinite(threshold) ? threshold : 50)) / 100);
+        overdrive ? Math.min(0.95, Math.max(0, baseThreshold + signal(3) * (0.04 + flux * 0.2))) : baseThreshold);
       const markSize = parseFloat(this.getAttribute('mark-size'));
+      const baseMarkScale = Math.min(100, Math.max(0, Number.isFinite(markSize) ? markSize : 42)) / 100;
       gl.uniform1f(this._u.main.markScale,
-        Math.min(100, Math.max(0, Number.isFinite(markSize) ? markSize : 42)) / 100);
-      gl.uniform1f(this._u.main.time, time || 0);
+        overdrive ? Math.min(1, Math.max(0.05, baseMarkScale + signal(4) * (0.06 + flux * 0.2))) : baseMarkScale);
+      gl.uniform1i(this._u.main.overdrive, overdrive ? 1 : 0);
+      gl.uniform1f(this._u.main.flux, flux);
+      gl.uniform1f(this._u.main.seed, seed % 10000);
+      gl.uniform1f(this._u.main.time, effectTime);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
   }
