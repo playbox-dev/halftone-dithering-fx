@@ -31,7 +31,8 @@
  *   overdrive / flux / seed — deprecated aliases retained for older embeds
  *   paused       — present = freeze rendering
  *
- * JS API: el.play(), el.pause(), el.snapshot(), el.source = <img|video|canvas element>
+ * JS API: el.play(), el.pause(), el.whenReady(), el.renderNow(), el.snapshot(),
+ *         el.source = <img|video|canvas element>
  *
  * How it works (2 GPU passes, no CPU pixel work):
  *   1. Downsample: source → tiny texture with one texel per halftone cell;
@@ -286,6 +287,11 @@
       this._motionPhase = Math.PI * 0.5;
       this._motionElapsed = 0;
       this._lastMotionTime = 0;
+      this._captureCount = 0;
+      this._loadGeneration = 0;
+      this._sourceReady = Promise.resolve();
+      this._resolveSourceReady = null;
+      this._sourceError = null;
       this._motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
       this._reduceMotion = this._motionQuery.matches;
       this._onMotionChange = event => {
@@ -401,6 +407,11 @@
 
     /** Assign an existing <img>, <video>, or <canvas> as the source. */
     set source(el) {
+      this._resolveSourceReady?.();
+      this._loadGeneration += 1;
+      this._sourceReady = Promise.resolve();
+      this._resolveSourceReady = null;
+      this._sourceError = null;
       this._media = el;
       this._isVideo = el instanceof HTMLVideoElement;
       this._srcDirty = true;
@@ -413,16 +424,53 @@
     pause() { this.setAttribute('paused', ''); }
     get motionPhase() { return this._motionPhase; }
 
+    /** Wait until the most recently requested source is ready. */
+    async whenReady() {
+      while (true) {
+        const generation = this._loadGeneration;
+        await this._sourceReady;
+        if (generation === this._loadGeneration) break;
+      }
+      if (this._sourceError) throw this._sourceError;
+      if (!this._media) throw new Error('halftone-fx: no source is ready');
+      return this;
+    }
+
+    /** Temporarily stop the preview loop while an external capture clock renders frames. */
+    beginCapture() {
+      this._captureCount += 1;
+      this._syncLoop();
+      let finished = false;
+      return () => {
+        if (finished) return;
+        finished = true;
+        this._captureCount = Math.max(0, this._captureCount - 1);
+        this._lastMotionTime = 0;
+        this._syncLoop();
+      };
+    }
+
+    /** Render immediately and return the component's live WebGL canvas. */
+    renderNow({ advanceMotion = false } = {}) {
+      if (!this._gl || !this._media) {
+        throw new Error('halftone-fx: no source is ready to render');
+      }
+      this._render(performance.now() / 1000, advanceMotion);
+      this._gl.flush();
+      return this._canvas;
+    }
+
     /** Capture the current full-resolution WebGL frame as an image Blob. */
-    snapshot(type = 'image/png', quality) {
+    async snapshot(type = 'image/png', quality) {
+      await this.whenReady();
       return new Promise((resolve, reject) => {
         if (!this._gl || !this._media) {
           reject(new Error('halftone-fx: no source is ready to capture'));
           return;
         }
-        this._render(performance.now() / 1000);
+        const canvas = this.renderNow();
         this._gl.finish();
-        this._canvas.toBlob(blob => {
+        canvas.toBlob(blob => {
           if (blob) resolve(blob);
           else reject(new Error('halftone-fx: snapshot failed'));
         }, type, quality);
@@ -433,6 +481,20 @@
 
     _loadSrc(url) {
       if (!url) return;
+      this._resolveSourceReady?.();
+      const generation = ++this._loadGeneration;
+      this._sourceError = null;
+      this._sourceReady = new Promise(resolve => { this._resolveSourceReady = resolve; });
+      const settle = error => {
+        if (generation !== this._loadGeneration) return false;
+        this._sourceError = error || null;
+        this._resolveSourceReady?.();
+        this._resolveSourceReady = null;
+        this.dispatchEvent(new CustomEvent(error ? 'source-error' : 'source-ready', {
+          detail: { src: url, error: error || null },
+        }));
+        return true;
+      };
       const isVideo = this.getAttribute('type') === 'video' || VIDEO_RE.test(url);
       if (this._isVideo && this._media) this._media.pause();
       if (isVideo) {
@@ -444,25 +506,38 @@
         v.autoplay = true;
         v.src = url;
         v.addEventListener('loadeddata', () => {
+          if (generation !== this._loadGeneration) {
+            v.pause();
+            return;
+          }
           this._media = v;
           this._isVideo = true;
           this._srcDirty = true;
           v.play().catch(() => {});
+          settle();
           this._requestRender();
           this._syncLoop();
         });
-        v.addEventListener('error', e => console.error('halftone-fx: video failed', e));
+        v.addEventListener('error', () => {
+          const error = new Error(`halftone-fx: video failed to load: ${url}`);
+          if (settle(error)) console.error(error);
+        });
       } else {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.addEventListener('load', () => {
+          if (generation !== this._loadGeneration) return;
           this._media = img;
           this._isVideo = false;
           this._srcDirty = true;
+          settle();
           this._requestRender();
           this._syncLoop();
         });
-        img.addEventListener('error', e => console.error('halftone-fx: image failed', e));
+        img.addEventListener('error', () => {
+          const error = new Error(`halftone-fx: image failed to load: ${url}`);
+          if (settle(error)) console.error(error);
+        });
         img.src = url;
       }
     }
@@ -518,7 +593,7 @@
     }
 
     _animating() {
-      if (this.hasAttribute('paused') || !this._visible || !this._media) return false;
+      if (this._captureCount || this.hasAttribute('paused') || !this._visible || !this._media) return false;
       const motion = this._motionSettings();
       const movingField = motion.code > 0 && motion.amount > 0 && motion.speed > 0 && !this._reduceMotion;
       const animatedNoise = this.getAttribute('dither') === 'noise' && !this._reduceMotion;
@@ -546,14 +621,14 @@
 
     _requestRender() {
       // One-shot render for static states (loop handles animated ones).
-      if (this._raf || this._onceRaf || !this._gl || !this._media) return;
+      if (this._captureCount || this._raf || this._onceRaf || !this._gl || !this._media) return;
       this._onceRaf = requestAnimationFrame(t => {
         this._onceRaf = 0;
         if (!this._raf) this._render(t / 1000);
       });
     }
 
-    _render(time) {
+    _render(time, advanceWhileHidden = false) {
       const gl = this._gl;
       const media = this._media;
       if (!gl || !media) return;
@@ -561,7 +636,8 @@
 
       const motion = this._motionSettings();
       const movingField = motion.code > 0 && motion.amount > 0 && motion.speed > 0 && !this._reduceMotion;
-      const advanceMotion = movingField && !this.hasAttribute('paused') && this._visible;
+      const advanceMotion = movingField && !this.hasAttribute('paused') &&
+        (this._visible || advanceWhileHidden);
       if (advanceMotion) {
         if (this._lastMotionTime > 0) {
           const delta = Math.min(0.1, Math.max(0, (time || 0) - this._lastMotionTime));

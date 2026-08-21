@@ -55,6 +55,7 @@
   <nav class="nav">
     <a href="./index.html">← Playground</a>
     <a href="#quickstart">Quick start</a>
+    <a href="#downloads">Downloads</a>
     <a href="#studio">STUDIO</a>
     <a href="#params">URL params</a>
     <a href="#assets">Adding assets</a>
@@ -66,9 +67,9 @@
   <p>
     <strong>mimono halftone</strong> uses the stable <code>&lt;halftone-fx&gt;</code> component
     to render an image or video as animated square marks,
-    live in the browser, on the GPU. Instead of exporting a heavy video file, you embed
-    a tiny program: it stays razor-sharp on any screen, costs ~0.1&nbsp;ms of CPU per frame,
-    and a whole animated hero background weighs a few hundred kilobytes.
+    live in the browser, on the GPU. Download the result as an image or animation, or embed
+    the tiny live program: it stays razor-sharp on any screen, costs ~0.1&nbsp;ms of CPU per
+    frame, and a whole animated hero background weighs a few hundred kilobytes.
   </p>
 
   <h2 id="quickstart">Quick start</h2>
@@ -77,10 +78,33 @@
     <li>Pick a clip from <strong>Source</strong> (the list mirrors this repo's
         <code>webgl/assets/</code> folder), choose a <strong>Look</strong> preset, then tune
         any slider until it looks right.</li>
-    <li>Click <strong>⬇ Download PNG</strong> for a full-resolution still with transparency,
-        or <strong>📋 Export iframe</strong> for the live version.</li>
-    <li>Use the PNG directly, or paste the iframe into your site builder's embed/HTML element.</li>
+    <li>Choose PNG, GIF, or the video format available in your browser under
+        <strong>Format</strong>, then click Download. Use
+        <strong>📋 Export iframe</strong> when you want the live version instead.</li>
+    <li>Use the downloaded file directly, or paste the iframe into your site builder's
+        embed/HTML element.</li>
   </ol>
+
+  <h2 id="downloads">Downloading PNG, MP4, and GIF</h2>
+  <table>
+    <tr><th>Format</th><th>Output</th><th>Best for</th></tr>
+    <tr><td><strong>PNG</strong></td><td>Full preview resolution; preserves alpha when Transparent background is on</td><td>Still artwork and layouts</td></tr>
+    <tr><td><strong>MP4</strong></td><td>Up to 30 fps and 1080×1080; 3, 6, or 12 seconds</td><td>Social, slides, and broadly compatible video</td></tr>
+    <tr><td><strong>WebM</strong></td><td>Available when the browser supports it; same lengths and size limit</td><td>A browser-friendly video fallback</td></tr>
+    <tr><td><strong>GIF</strong></td><td>10 fps; up to 480×480; 3 or 6 seconds; loops forever</td><td>Messages, docs, and quick previews</td></tr>
+  </table>
+  <p>Animation export records the live preview from its current pose and is silent. Keep the
+     tab visible until capture finishes; the Download button becomes <strong>Cancel export</strong>
+     while it works.</p>
+  <div class="tip">
+    <strong>Transparency:</strong> PNG keeps full alpha when Transparent background is on.
+    Video and GIF put the selected
+    <strong>Background</strong> color behind transparent marks (Base Gray by default), which
+    preserves the soft square edges instead of turning transparent pixels black.
+  </div>
+  <p>MP4 encoding is provided by the browser. If the current browser cannot create a real MP4,
+     the option is marked unavailable and WebM is offered when possible. The app never puts
+     WebM data inside a file named <code>.mp4</code>.</p>
 
   <h2 id="studio">Embedding in STUDIO (studio.design)</h2>
   <ol>
@@ -140,7 +164,7 @@
   <p>Assets live in the repo, so they're versioned and served with correct CORS headers.
      To add one:</p>
   <ol>
-    <li>Open <a href="https://github.com/playbox-dev/halftone-dithering-fx/tree/master/webgl/assets">webgl/assets on GitHub</a>
+    <li>Open <a href="https://github.com/playbox-dev/halftone-dithering-fx/tree/main/webgl/assets">webgl/assets on GitHub</a>
         → <strong>Add file → Upload files</strong> → commit.</li>
     <li>Wait ~1 minute for GitHub Pages to redeploy.</li>
     <li>Reload the playground — the file appears in the <strong>Source</strong> dropdown
@@ -215,9 +239,13 @@
      Yes, if the host sends CORS headers (<code>Access-Control-Allow-Origin</code>).
      GitHub Pages does; most random hosts don't. When in doubt, commit it to
      <code>webgl/assets/</code>.</p>
+  <p><strong>Why did animation export stop when I switched tabs?</strong><br>
+     Browsers pause visual animation in hidden tabs. Keep this tab visible while recording so
+     the saved timing matches the preview.</p>
   <p><strong>Does it work on phones?</strong><br>
-     Yes — WebGL2 is supported by all current browsers including iOS Safari, and the effect
-     is far lighter than a CSS blur. The component also pauses itself when scrolled offscreen.</p>
+     The live preview works on current phones and is far lighter than a CSS blur. Available
+     video formats depend on the browser, and longer GIFs may be limited by device memory.
+     The component also pauses itself when scrolled offscreen.</p>
 
   <footer>
     <a href="https://github.com/playbox-dev/halftone-dithering-fx">GitHub repo</a> ·

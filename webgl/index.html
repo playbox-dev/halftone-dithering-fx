@@ -80,6 +80,9 @@
       align-items: center;
       font-size: 12px;
       width: min(360px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      scrollbar-width: thin;
     }
     .panel label { color: #444; }
     .panel input[type="range"] { width: 100%; accent-color: var(--play-red); }
@@ -96,11 +99,30 @@
       text-decoration: none; padding: 2px;
     }
     .panel .help-link:hover { color: var(--text-red); }
+    .panel .help-link[aria-disabled="true"] { opacity: 0.45; pointer-events: none; }
     .panel .export-btn {
       grid-column: 1 / 4; padding: 9px; border: 1px solid var(--play-red); border-radius: 0;
       background: var(--play-red); color: var(--ink); font-weight: 700; font-size: 12px; cursor: pointer;
     }
     .panel .export-btn:hover { background: var(--ink); border-color: var(--ink); color: #fff; }
+    .panel .export-btn:disabled { cursor: not-allowed; opacity: 0.55; }
+    .panel .export-btn:disabled:hover { background: var(--play-red); border-color: var(--play-red); color: var(--ink); }
+    .panel .export-btn.cancel-btn { background: #fff; border-color: var(--ink); color: var(--ink); }
+    .panel .export-status {
+      grid-column: 1 / 4;
+      min-height: 2.4em;
+      color: #555;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .panel .export-status.error { color: #a00; }
+    .panel .export-progress {
+      grid-column: 1 / 4;
+      width: 100%;
+      height: 4px;
+      border: 0;
+      accent-color: var(--play-red);
+    }
     .panel .embed-btn { background: var(--ink); border-color: var(--ink); color: #fff; }
     .panel .embed-btn:hover { background: var(--play-red); border-color: var(--play-red); color: var(--ink); }
     .panel .upload-btn {
@@ -111,8 +133,7 @@
     .panel .upload-btn:disabled { cursor: wait; opacity: 0.6; }
     .panel .upload-btn.error { border-color: #a00; color: #a00; }
     .panel input[type="range"]:disabled { opacity: 0.35; }
-    @media (min-width: 601px) and (max-height: 520px) {
-      .panel { max-height: calc(100vh - 32px); overflow-y: auto; }
+    @media (min-width: 601px) {
       .brand-lockup { left: auto; right: 16px; }
     }
     @media (max-width: 600px) {
@@ -227,8 +248,8 @@
     <label for="dotColor">Marks</label>
     <input type="color" id="dotColor" value="#ff3110">
 
-    <label for="bgColor">Background</label>
-    <input type="color" id="bgColor" value="#f3f3f3" disabled>
+    <label for="bgColor">Background / matte</label>
+    <input type="color" id="bgColor" value="#f3f3f3">
 
     <div class="row-check">
       <input type="checkbox" id="transparentBg" checked>
@@ -258,13 +279,30 @@
     <input type="range" id="speed" min="0" max="100" value="35" disabled>
     <output id="speedOut">35</output>
 
-    <button class="export-btn" id="downloadPng">⬇ Download PNG</button>
+    <label for="exportFormat">Format</label>
+    <select id="exportFormat">
+      <option value="png" selected>PNG image</option>
+      <option value="mp4">MP4 video</option>
+      <option value="gif">Animated GIF</option>
+    </select>
+
+    <label for="exportDuration" id="exportDurationLabel" hidden>Length</label>
+    <select id="exportDuration" hidden>
+      <option value="3">3 seconds</option>
+      <option value="6" selected>6 seconds</option>
+      <option value="12">12 seconds</option>
+    </select>
+
+    <button class="export-btn" id="downloadMedia">⬇ Download PNG</button>
+    <div class="export-status" id="exportStatus" role="status" aria-live="polite" aria-atomic="true">PNG keeps transparency. Video and GIF use #f3f3f3 behind transparent marks.</div>
+    <progress class="export-progress" id="exportProgress" max="1" value="0" aria-label="Export progress" hidden></progress>
     <button class="export-btn embed-btn" id="exportIframe">📋 Export iframe (copy embed code)</button>
 
     <a class="help-link" href="./help.html">❓ Help — embedding, STUDIO, adding assets</a>
   </div>
 
-  <script src="./halftone-fx.js"></script>
+  <script src="./halftone-fx.js?v=7"></script>
+  <script src="./export-media.js?v=7"></script>
   <script>
     const fx = document.getElementById('fx');
     const presetSelect = document.getElementById('preset');
@@ -307,7 +345,6 @@
     bind('dither', 'dither');
     bind('shape', 'shape');
     bind('dotColor', 'dot-color');
-    bind('bgColor', 'background');
 
     const PRESETS = {
       sparse: { grid: 80, markSize: 42,  brightness: 12, threshold: 50, contrast: 0,  gamma: 1,   dither: 'none',   shape: 'square', multicolor: false },
@@ -352,8 +389,12 @@
     });
 
     const bgColorInput = document.getElementById('bgColor');
+    bgColorInput.addEventListener('input', () => {
+      if (!document.getElementById('transparentBg').checked) {
+        fx.setAttribute('background', bgColorInput.value);
+      }
+    });
     document.getElementById('transparentBg').addEventListener('change', e => {
-      bgColorInput.disabled = e.target.checked;
       fx.setAttribute('background', e.target.checked ? 'transparent' : bgColorInput.value);
       document.querySelector('.hero').classList.toggle('checker', e.target.checked);
     });
@@ -369,7 +410,7 @@
 
     // Populate the Source dropdown from the repo's assets folder on GitHub,
     // so committing a new file there makes it appear here — no code changes.
-    const ASSETS_API = 'https://api.github.com/repos/playbox-dev/halftone-dithering-fx/contents/webgl/assets';
+    const ASSETS_API = 'https://api.github.com/repos/playbox-dev/halftone-dithering-fx/contents/webgl/assets?ref=main';
     const MEDIA_RE = /\.(mp4|webm|ogv|mov|m4v|png|jpe?g|gif|webp|avif)$/i;
     (async () => {
       try {
@@ -426,6 +467,7 @@
     const uploadBtn = document.getElementById('uploadBtn');
     const uploadInput = document.getElementById('uploadInput');
     const uploadIdle = uploadBtn.textContent;
+    let uploadInProgress = false;
 
     let uploadStatusTimer = 0;
     function uploadStatus(text, isError) {
@@ -445,7 +487,9 @@
       if (!file) return;
       if (file.size > UPLOAD_MAX_BYTES) return uploadStatus('✗ Over the 50MB limit', true);
 
+      uploadInProgress = true;
       uploadBtn.disabled = true;
+      downloadBtn.disabled = true;
       uploadStatus('⏳ Uploading…');
       try {
         const r = await fetch(UPLOAD_ENDPOINT, {
@@ -470,35 +514,226 @@
       } catch (err) {
         uploadStatus('✗ ' + err.message, true);
       } finally {
+        uploadInProgress = false;
         uploadBtn.disabled = false;
+        if (!activeExport) downloadBtn.disabled = false;
       }
     });
 
-    // --- Download PNG ---
-    const downloadBtn = document.getElementById('downloadPng');
-    downloadBtn.addEventListener('click', async () => {
-      const label = downloadBtn.textContent;
-      downloadBtn.disabled = true;
-      downloadBtn.textContent = 'Rendering PNG…';
-      try {
-        const blob = await fx.snapshot();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'mimono-halftone.png';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        downloadBtn.textContent = '✓ PNG downloaded';
-      } catch (err) {
-        console.error(err);
-        downloadBtn.textContent = '✗ Download failed';
-      } finally {
+    // --- Download PNG / MP4 / WebM / GIF ---
+    const panel = document.querySelector('.panel');
+    const exportFormat = document.getElementById('exportFormat');
+    const exportDuration = document.getElementById('exportDuration');
+    const exportDurationLabel = document.getElementById('exportDurationLabel');
+    const exportStatus = document.getElementById('exportStatus');
+    const exportProgress = document.getElementById('exportProgress');
+    const downloadBtn = document.getElementById('downloadMedia');
+    const helpLink = panel.querySelector('.help-link');
+    const transparentBgInput = document.getElementById('transparentBg');
+    const mediaExporter = new MimonoMediaExporter(fx, {
+      getMatte: () => bgColorInput.value,
+    });
+    const capabilities = MimonoMediaExporter.capabilities();
+    let activeExport = null;
+    let disabledBeforeExport = null;
+    let helpLinkTabIndex = null;
+    let exportStatusTimer = 0;
+    let lastProgressAnnouncement = '';
+
+    const mp4Option = exportFormat.querySelector('option[value="mp4"]');
+    const gifOption = exportFormat.querySelector('option[value="gif"]');
+    if (!capabilities.mp4) {
+      mp4Option.disabled = true;
+      mp4Option.textContent = 'MP4 — unavailable in this browser';
+    }
+    if (capabilities.webm) {
+      const webmOption = document.createElement('option');
+      webmOption.value = 'webm';
+      webmOption.textContent = 'WebM video';
+      mp4Option.after(webmOption);
+    }
+    gifOption.disabled = true;
+    gifOption.textContent = capabilities.gif ? 'GIF — checking support…' : 'GIF — unavailable in this browser';
+    if (capabilities.gif) MimonoMediaExporter.gifSupported().then(supported => {
+      gifOption.disabled = !supported;
+      gifOption.textContent = supported ? 'Animated GIF' : 'GIF — unavailable in this browser';
+    });
+
+    function formatName(format = exportFormat.value) {
+      return { png: 'PNG', mp4: 'MP4', webm: 'WebM', gif: 'GIF' }[format] || format.toUpperCase();
+    }
+
+    function defaultExportStatus() {
+      const format = exportFormat.value;
+      if (format === 'png') {
+        return transparentBgInput.checked
+          ? 'PNG keeps transparency.'
+          : 'PNG includes the selected background.';
+      }
+      if (transparentBgInput.checked) {
+        return `${formatName()} uses ${bgColorInput.value.toUpperCase()} behind transparent marks. Exports are silent.`;
+      }
+      return `${formatName()} uses the selected background. Exports are silent.`;
+    }
+
+    function setExportStatus(message, isError = false) {
+      clearTimeout(exportStatusTimer);
+      exportStatus.textContent = message;
+      exportStatus.classList.toggle('error', isError);
+    }
+
+    function updateExportUi(resetStatus = true) {
+      const format = exportFormat.value;
+      const animated = format !== 'png';
+      exportDuration.hidden = !animated;
+      exportDurationLabel.hidden = !animated;
+      const longOption = exportDuration.querySelector('option[value="12"]');
+      longOption.disabled = format === 'gif';
+      if (format === 'gif' && exportDuration.value === '12') exportDuration.value = '6';
+      if (!activeExport) downloadBtn.textContent = `⬇ Download ${formatName(format)}`;
+      if (!activeExport) exportProgress.hidden = true;
+      if (resetStatus) setExportStatus(defaultExportStatus());
+    }
+
+    function setExportBusy(busy) {
+      const controls = [...panel.querySelectorAll('button, input, select')];
+      if (busy) {
+        disabledBeforeExport = new Map(controls.map(control => [control, control.disabled]));
+        controls.forEach(control => { control.disabled = true; });
         downloadBtn.disabled = false;
-        setTimeout(() => { downloadBtn.textContent = label; }, 2500);
+        downloadBtn.classList.add('cancel-btn');
+        downloadBtn.textContent = 'Cancel export';
+        helpLinkTabIndex = helpLink.getAttribute('tabindex');
+        helpLink.setAttribute('aria-disabled', 'true');
+        helpLink.setAttribute('tabindex', '-1');
+        lastProgressAnnouncement = '';
+        return;
+      }
+      if (disabledBeforeExport) {
+        for (const [control, disabled] of disabledBeforeExport) control.disabled = disabled;
+      }
+      disabledBeforeExport = null;
+      downloadBtn.classList.remove('cancel-btn');
+      helpLink.removeAttribute('aria-disabled');
+      if (helpLinkTabIndex === null) helpLink.removeAttribute('tabindex');
+      else helpLink.setAttribute('tabindex', helpLinkTabIndex);
+      helpLinkTabIndex = null;
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    function showProgress(progress) {
+      let announcement = '';
+      if (progress.stage === 'rendering') {
+        exportProgress.hidden = true;
+        announcement = 'Rendering PNG…';
+      } else if (progress.stage === 'recording') {
+        exportProgress.hidden = false;
+        exportProgress.max = progress.duration;
+        exportProgress.value = progress.elapsed;
+        const elapsed = Math.min(progress.duration, Math.floor(progress.elapsed));
+        announcement = `Recording ${formatName(progress.format)}… ${elapsed} / ${progress.duration} s`;
+      } else if (progress.stage === 'finalizing') {
+        exportProgress.hidden = false;
+        exportProgress.removeAttribute('value');
+        announcement = `Finalizing ${formatName(progress.format)}…`;
+      } else if (progress.stage === 'capturing') {
+        exportProgress.hidden = false;
+        exportProgress.max = progress.total;
+        exportProgress.value = progress.current;
+        const percent = Math.floor(progress.current / progress.total * 10) * 10;
+        announcement = `Capturing GIF frames… ${percent}%`;
+      } else if (progress.stage === 'encoding') {
+        exportProgress.hidden = false;
+        exportProgress.max = progress.total;
+        exportProgress.value = progress.current;
+        const percent = Math.floor(progress.current / progress.total * 10) * 10;
+        announcement = `Encoding GIF… ${percent}%`;
+      }
+      if (announcement && announcement !== lastProgressAnnouncement) {
+        lastProgressAnnouncement = announcement;
+        setExportStatus(announcement);
+      }
+    }
+
+    exportFormat.addEventListener('change', updateExportUi);
+    bgColorInput.addEventListener('input', () => {
+      if (!activeExport) setExportStatus(defaultExportStatus());
+    });
+    transparentBgInput.addEventListener('change', () => {
+      if (!activeExport) setExportStatus(defaultExportStatus());
+    });
+    helpLink.addEventListener('click', event => {
+      if (activeExport) event.preventDefault();
+    });
+
+    downloadBtn.addEventListener('click', async () => {
+      if (activeExport) {
+        activeExport.abort();
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = 'Cancelling…';
+        setExportStatus('Cancelling export…');
+        return;
+      }
+      if (uploadInProgress) {
+        setExportStatus('Wait for the upload to finish before exporting.');
+        return;
+      }
+
+      const format = exportFormat.value;
+      const duration = Number(exportDuration.value);
+      const controller = new AbortController();
+      activeExport = controller;
+      setExportBusy(true);
+      let exportHadError = false;
+
+      try {
+        const result = await mediaExporter.export(format, {
+          duration,
+          signal: controller.signal,
+          onProgress: showProgress,
+        });
+        const filename = `mimono-halftone.${result.extension}`;
+        window.__lastMediaExport = {
+          format,
+          filename,
+          mimeType: result.mimeType,
+          size: result.blob.size,
+        };
+        downloadBlob(result.blob, filename);
+        setExportStatus(`${formatName(format)} downloaded`);
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          setExportStatus('Export cancelled');
+        } else {
+          exportHadError = true;
+          console.error(error);
+          setExportStatus(error?.message || 'Export failed', true);
+        }
+      } finally {
+        if (activeExport === controller) activeExport = null;
+        setExportBusy(false);
+        updateExportUi(false);
+        if (!exportHadError) {
+          exportStatusTimer = setTimeout(() => {
+            if (!activeExport) setExportStatus(defaultExportStatus());
+          }, 4000);
+        }
       }
     });
+
+    window.addEventListener('pagehide', () => activeExport?.abort());
+
+    updateExportUi();
 
     // --- Export iframe ---
     // Emits only params that differ from embed.html's defaults, so URLs stay short.

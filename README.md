@@ -2,7 +2,8 @@
 
 A browser-based halftone / dithering effect generator reworked for mimono. The WebGL experience defaults to square marks inside a square frame; the original circle treatment remains available with `shape="circle"`.
 
-No build step, no dependencies — just static HTML/CSS/JS.
+No build step or package install — just static HTML/CSS/JS. The GIF encoder is pinned and
+vendored locally, so exports do not load code from a CDN.
 
 Two flavors:
 
@@ -24,9 +25,9 @@ Copy `webgl/halftone-fx.js` into your project and:
 
 Why it's cheap: instead of reading pixels back to JS every frame, it runs two GPU passes — (1) the source is cover-cropped and downsampled to one texel per halftone cell (mipmap filtering computes the cell averages in hardware), (2) a fullscreen shader draws one anti-aliased mark per cell. No `getImageData`, no per-pixel JS loops, renders at `devicePixelRatio` so it stays sharp on retina/4K, and it auto-pauses when scrolled offscreen.
 
-Attributes (all reactive): `src`, `grid`, `shape` (`square` by default or legacy `circle`), `mark-size` (spacing), `threshold` (minimum mark size), `dot-color`, `background` (hex or `transparent`), `brightness`, `contrast`, `gamma`, `dither`, `multicolor`, `motion`, `amount`, `speed`, `phase`, `paused`. Motion modes are `pulse`, `radial`, `sweep`, `interference`, and `scan`; the deprecated `overdrive`, `flux`, and `seed` attributes remain accepted for old embeds. JS API: `el.play()`, `el.pause()`, `await el.snapshot()`, `el.source = <img|video|canvas>`.
+Attributes (all reactive): `src`, `grid`, `shape` (`square` by default or legacy `circle`), `mark-size` (spacing), `threshold` (minimum mark size), `dot-color`, `background` (hex or `transparent`), `brightness`, `contrast`, `gamma`, `dither`, `multicolor`, `motion`, `amount`, `speed`, `phase`, `paused`. Motion modes are `pulse`, `radial`, `sweep`, `interference`, and `scan`; the deprecated `overdrive`, `flux`, and `seed` attributes remain accepted for old embeds. JS API: `el.play()`, `el.pause()`, `await el.whenReady()`, `el.renderNow()`, `await el.snapshot()`, `el.source = <img|video|canvas>`.
 
-**Live demo:** <https://playbox-dev.github.io/halftone-dithering-fx/webgl/> — pick a source from `webgl/assets/` (the dropdown syncs with the repo), tune the look, then download a transparent PNG or export ready-to-paste iframe code. Full guide: [help page](https://playbox-dev.github.io/halftone-dithering-fx/webgl/help.html).
+**Live demo:** <https://playbox-dev.github.io/halftone-dithering-fx/webgl/> — pick a source from `webgl/assets/` (the dropdown syncs with the repo), tune the look, then download PNG, MP4, or GIF, or export ready-to-paste iframe code. Full guide: [help page](https://playbox-dev.github.io/halftone-dithering-fx/webgl/help.html).
 
 ### Picking a dither mode for animation
 
@@ -72,7 +73,8 @@ Params: `src` (media URL; add `type=video` for extension-less video URLs), `grid
 - Adjustable grid size, mark spacing, minimum-size threshold, brightness, contrast, gamma, and smoothing
 - Multiple dithering algorithms: Floyd–Steinberg, Jarvis-Judice-Ninke, Stucki, Burkes, Ordered (Bayer), Noise, or none
 - Square or circle marks, custom mark/background colors, and rainbow multicolor mode
-- Export as **PNG**, **SVG**, or **WebM video** (records the live canvas)
+- WebGL playground export as **PNG**, real **MP4** where the browser supports it, or animated **GIF**; honest WebM fallback when MP4 is unavailable
+- Classic root tool export as **PNG**, **SVG**, or **WebM video**
 - Light / dark mode
 
 ## Run it
@@ -97,3 +99,6 @@ Then open <http://localhost:8000> in your browser.
 ## Credits
 
 Original code idea by [Mike Bespalov](https://codepen.io/Mikhail-Bespalov/pen/dPyyZed). Updates and additions by [Bogdan Rosu](https://bogdanrosu.com).
+
+Animated GIF export uses [gifenc](https://github.com/mattdesl/gifenc) by Matt DesLauriers,
+vendored under its MIT license at `webgl/vendor/gifenc-LICENSE.md`.
