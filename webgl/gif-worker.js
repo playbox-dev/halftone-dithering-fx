@@ -1,4 +1,4 @@
-import { GIFEncoder, quantize, applyPalette } from './vendor/gifenc.esm.js?v=7';
+import { GIFEncoder, quantize, applyPalette } from './vendor/gifenc.esm.js?v=15';
 
 let gif = null;
 let width = 0;

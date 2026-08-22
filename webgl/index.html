@@ -23,11 +23,12 @@
       color: var(--ink);
     }
 
-    /* Keep the stage 1:1 so the default artwork stays geometrically balanced. */
+    /* Fit the current frame ratio inside the viewport without stretching it. */
     .hero {
+      --frame-aspect: 1;
       position: relative;
-      width: min(100vw, 100vh);
-      aspect-ratio: 1;
+      width: min(100vw, calc(100vh * var(--frame-aspect)));
+      aspect-ratio: var(--frame-aspect);
       background: var(--base-gray);
       overflow: hidden;
     }
@@ -194,6 +195,12 @@
     <button class="upload-btn" id="uploadBtn" type="button">⬆️ Upload your own media</button>
     <input type="file" id="uploadInput" accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime" hidden>
 
+    <label for="frame">Frame</label>
+    <select id="frame">
+      <option value="source" selected>Source ratio</option>
+      <option value="square">Square crop</option>
+    </select>
+
     <label for="preset">Look</label>
     <select id="preset">
       <option value="custom">Custom</option>
@@ -301,15 +308,36 @@
     <a class="help-link" href="./help.html">❓ Help — embedding, STUDIO, adding assets</a>
   </div>
 
-  <script src="./halftone-fx.js?v=7"></script>
-  <script src="./export-media.js?v=7"></script>
+  <script src="./halftone-fx.js?v=15"></script>
+  <script src="./export-media.js?v=15"></script>
   <script>
     const fx = document.getElementById('fx');
+    const hero = document.querySelector('.hero');
+    const frameInput = document.getElementById('frame');
     const presetSelect = document.getElementById('preset');
     const motionInput = document.getElementById('motion');
     const amountInput = document.getElementById('amount');
     const speedInput = document.getElementById('speed');
     let applyingPreset = false;
+    let sourceFrame = { width: 1, height: 1, aspectRatio: 1 };
+
+    function applyFrame() {
+      const sourceRatio = Number.isFinite(sourceFrame.aspectRatio) && sourceFrame.aspectRatio > 0
+        ? sourceFrame.aspectRatio : 1;
+      const ratio = frameInput.value === 'square' ? 1 : sourceRatio;
+      hero.style.setProperty('--frame-aspect', String(ratio));
+      fx.setAttribute('aspect', frameInput.value);
+    }
+
+    fx.addEventListener('source-ready', event => {
+      const { width, height, aspectRatio } = event.detail || {};
+      if (width > 0 && height > 0 && aspectRatio > 0) {
+        sourceFrame = { width, height, aspectRatio };
+        applyFrame();
+      }
+    });
+    frameInput.addEventListener('change', applyFrame);
+    applyFrame();
 
     function setMotion(mode) {
       const active = mode !== 'off';
@@ -746,6 +774,7 @@
       const local = /^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname);
       const base = local ? CANONICAL_EMBED : new URL('embed.html', location.href).href;
       const p = new URLSearchParams();
+      p.set('aspect', frameInput.value);
       if (currentSrc !== EMBED_DEFAULTS.src) p.set('src', currentSrc);
       const vals = {
         grid: document.getElementById('grid').value,
@@ -771,24 +800,37 @@
         p.set('phase', fx.motionPhase.toFixed(4));
       }
       const q = p.toString().replace(/=(?=&|$)/g, '').replace(/%2F/gi, '/');
+      const frameAspect = frameInput.value === 'square'
+        ? '1/1'
+        : `${sourceFrame.width || 1}/${sourceFrame.height || 1}`;
       return `<iframe src="${base}${q ? '?' + q : ''}"\n` +
-             `        style="width:100%;aspect-ratio:1/1;display:block;border:0;pointer-events:none"\n` +
+             `        style="width:100%;aspect-ratio:${frameAspect};display:block;border:0;pointer-events:none"\n` +
              `        allow="autoplay" loading="lazy" title="mimono halftone visual"></iframe>`;
     }
 
     const exportBtn = document.getElementById('exportIframe');
     exportBtn.addEventListener('click', async () => {
-      const code = buildEmbedCode();
-      window.__lastExport = code;
-      exportBtn.dataset.lastExport = code;
       const label = exportBtn.textContent;
       const done = '✓ Copied! Paste into your site builder';
+      let code = '';
       try {
+        exportBtn.textContent = 'Preparing embed…';
+        await fx.whenReady();
+        const dimensions = fx.sourceDimensions;
+        if (dimensions.width > 0 && dimensions.height > 0) sourceFrame = dimensions;
+        code = buildEmbedCode();
+        window.__lastExport = code;
+        exportBtn.dataset.lastExport = code;
         await navigator.clipboard.writeText(code);
         exportBtn.textContent = done;
-      } catch {
-        window.prompt('Copy the embed code:', code);
-        exportBtn.textContent = done;
+      } catch (error) {
+        if (code) {
+          window.prompt('Copy the embed code:', code);
+          exportBtn.textContent = done;
+        } else {
+          console.error(error);
+          exportBtn.textContent = '✗ Embed export failed';
+        }
       }
       setTimeout(() => { exportBtn.textContent = label; }, 2500);
     });

@@ -76,8 +76,9 @@
   <ol>
     <li>Open the <a href="./index.html">playground</a>.</li>
     <li>Pick a clip from <strong>Source</strong> (the list mirrors this repo's
-        <code>webgl/assets/</code> folder), choose a <strong>Look</strong> preset, then tune
-        any slider until it looks right.</li>
+        <code>webgl/assets/</code> folder). <strong>Frame</strong> follows its original ratio
+        by default; choose <strong>Square crop</strong> only when you want a centered 1:1 cut.
+        Choose a <strong>Look</strong> preset, then tune any slider until it looks right.</li>
     <li>Choose PNG, GIF, or the video format available in your browser under
         <strong>Format</strong>, then click Download. Use
         <strong>📋 Export iframe</strong> when you want the live version instead.</li>
@@ -88,10 +89,10 @@
   <h2 id="downloads">Downloading PNG, MP4, and GIF</h2>
   <table>
     <tr><th>Format</th><th>Output</th><th>Best for</th></tr>
-    <tr><td><strong>PNG</strong></td><td>Full preview resolution; preserves alpha when Transparent background is on</td><td>Still artwork and layouts</td></tr>
-    <tr><td><strong>MP4</strong></td><td>Up to 30 fps and 1080×1080; 3, 6, or 12 seconds</td><td>Social, slides, and broadly compatible video</td></tr>
+    <tr><td><strong>PNG</strong></td><td>Full preview resolution and selected frame ratio; preserves alpha when Transparent background is on</td><td>Still artwork and layouts</td></tr>
+    <tr><td><strong>MP4</strong></td><td>Up to 30 fps and 1080 px on the longest edge; 3, 6, or 12 seconds</td><td>Social, slides, and broadly compatible video</td></tr>
     <tr><td><strong>WebM</strong></td><td>Available when the browser supports it; same lengths and size limit</td><td>A browser-friendly video fallback</td></tr>
-    <tr><td><strong>GIF</strong></td><td>10 fps; up to 480×480; 3 or 6 seconds; loops forever</td><td>Messages, docs, and quick previews</td></tr>
+    <tr><td><strong>GIF</strong></td><td>10 fps; up to 480 px on the longest edge; 3 or 6 seconds; loops forever</td><td>Messages, docs, and quick previews</td></tr>
   </table>
   <p>Animation export records the live preview from its current pose and is silent. Keep the
      tab visible until capture finishes; the Download button becomes <strong>Cancel export</strong>
@@ -113,8 +114,8 @@
     <li>Select the box, open the settings panel on the right, and paste the code from
         <strong>Export iframe</strong> into the <strong>埋め込みコード</strong> (embed code) field.</li>
     <li>Size and position the box like any element — for a hero background, make it fill
-        the section and layer your text boxes on top. Keep its width and height equal for
-        the default 1:1 composition.</li>
+        the section and layer your text boxes on top. The exported ratio matches the source;
+        choose <strong>Square crop</strong> before exporting when you want a centered 1:1 cut.</li>
     <li>The editor canvas may show a placeholder instead of the animation — that's normal.
         Check <strong>プレビュー</strong> (preview), then <strong>公開</strong> (publish).</li>
   </ol>
@@ -127,17 +128,20 @@
     <strong>Backgrounds:</strong> the exported code includes <code>pointer-events:none</code>
     so clicks and scrolling pass through to your page. Remove it if the animation should be
     interactive. Set the <code>bg</code> param to your page's background color so the
-     iframe edges are invisible. The exported iframe includes <code>aspect-ratio:1/1</code>
-     so the default box stays square.
+     iframe edges are invisible. New exports include the source's numeric
+     <code>aspect-ratio</code>; choosing Square crop emits <code>1/1</code> instead. For a
+     custom crop, use the same ratio in both the URL's <code>aspect</code> parameter and the
+     iframe style.
   </div>
 
   <h2 id="params">URL parameters</h2>
   <p>The embed page is configured entirely by its URL — edit params and reload to restyle,
      no code changes ever:</p>
-  <pre><code>https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html?src=./assets/horse.mp4&amp;grid=80&amp;shape=square&amp;size=42&amp;threshold=50</code></pre>
+  <pre><code>https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html?src=./assets/horse.mp4&amp;aspect=source&amp;grid=80&amp;shape=square&amp;size=42&amp;threshold=50</code></pre>
   <table>
     <tr><th>Param</th><th>Values</th><th>Meaning</th></tr>
     <tr><td><code>src</code></td><td>URL</td><td>Image or video. Relative (<code>./assets/…</code>) or any CORS-accessible absolute URL. Add <code>type=video</code> for video URLs without a file extension.</td></tr>
+    <tr><td><code>aspect</code></td><td><code>source</code> / <code>square</code> / ratio</td><td>Output frame. New exports use the source ratio by default; ratios such as <code>4/5</code> are also accepted. Omitted on legacy embeds means square.</td></tr>
     <tr><td><code>grid</code></td><td>1–320 in the playground</td><td>Halftone cell size in px. Smaller = more detail; larger = fewer marks. Default 80.</td></tr>
     <tr><td><code>shape</code></td><td><code>square</code> / <code>circle</code></td><td>Mark geometry. Default <code>square</code>; <code>circle</code> preserves the legacy look.</td></tr>
     <tr><td><code>size</code></td><td>0–100</td><td>Maximum mark size within each cell. Lower values create more space between squares. Default 42.</td></tr>
@@ -212,7 +216,7 @@
      The operating system's reduced-motion setting disables the field and shows the untouched
      look. Previously exported <code>overdrive</code>, <code>flux</code>, and <code>seed</code>
      params remain accepted for compatibility.</p>
-  <pre><code>embed.html?src=./assets/horse.mp4&amp;grid=3&amp;dither=grain&amp;motion=radial&amp;amount=35&amp;speed=35</code></pre>
+  <pre><code>embed.html?src=./assets/horse.mp4&amp;aspect=source&amp;grid=3&amp;dither=grain&amp;motion=radial&amp;amount=35&amp;speed=35</code></pre>
 
   <h2 id="perf">Performance</h2>
   <p>Measured head-to-head against the CPU original (same video, 1920×1080, Apple M2 Pro):

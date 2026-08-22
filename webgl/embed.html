@@ -8,10 +8,11 @@
     html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
     body { display: grid; place-items: center; }
     halftone-fx { width: min(100vw, 100vh); aspect-ratio: 1; }
+    html[data-framed] halftone-fx { width: 100%; height: 100%; aspect-ratio: auto; }
   </style>
 </head>
 <body>
-  <script src="./halftone-fx.js"></script>
+  <script src="./halftone-fx.js?v=15"></script>
   <script>
     // Configure entirely via query params, e.g.:
     //   embed.html?grid=80&shape=square&size=42&threshold=50&dot=ff3110&bg=transparent
@@ -22,6 +23,8 @@
 
     // Aliases included (bg/background, dot/dotcolor/dot-color) so hand-written
     // URLs can't silently miss.
+    const requestedAspect = p.has('aspect') ? p.get('aspect') : p.get('frame');
+    if (requestedAspect !== null) fx.setAttribute('aspect', requestedAspect);
     const ATTRS = {
       src: 'src', type: 'type', grid: 'grid', shape: 'shape', threshold: 'threshold',
       size: 'mark-size', marksize: 'mark-size', 'mark-size': 'mark-size',
@@ -35,6 +38,9 @@
     for (const [param, attr] of Object.entries(ATTRS)) {
       if (p.has(param)) fx.setAttribute(attr, p.get(param));
     }
+    // Old embed URLs stay square. New URLs carry an explicit frame, which is
+    // fitted inside the available viewport without stretching.
+    if (requestedAspect !== null) document.documentElement.dataset.framed = '';
     if (p.has('multicolor')) fx.setAttribute('multicolor', '');
     const isEnabled = value => !['0', 'false', 'off', 'no'].includes((value || '').toLowerCase());
     if (!p.has('motion') && p.has('overdrive') && isEnabled(p.get('overdrive'))) {
@@ -51,7 +57,33 @@
     if (!fx.hasAttribute('background')) fx.setAttribute('background', 'transparent');
     if (!fx.hasAttribute('brightness')) fx.setAttribute('brightness', '12');
 
+    function frameRatio() {
+      const raw = (requestedAspect || 'source').trim().toLowerCase();
+      if (raw === 'square' || raw === '1:1') return 1;
+      if (['source', 'auto', 'original'].includes(raw)) return fx.sourceAspectRatio || 1;
+      const parts = raw.split(/[/:]/).map(Number);
+      const ratio = parts.length === 2 && parts[0] > 0 && parts[1] > 0
+        ? parts[0] / parts[1] : Number(raw);
+      return Number.isFinite(ratio) && ratio > 0 ? ratio : 1;
+    }
+
+    function fitFrame() {
+      if (requestedAspect === null) return;
+      const ratio = frameRatio();
+      const viewportRatio = innerWidth / Math.max(1, innerHeight);
+      if (viewportRatio > ratio) {
+        fx.style.width = `${innerHeight * ratio}px`;
+        fx.style.height = `${innerHeight}px`;
+      } else {
+        fx.style.width = `${innerWidth}px`;
+        fx.style.height = `${innerWidth / ratio}px`;
+      }
+    }
+
+    fx.addEventListener('source-ready', fitFrame);
+    window.addEventListener('resize', fitFrame);
     document.body.appendChild(fx);
+    fitFrame();
   </script>
 </body>
 </html>

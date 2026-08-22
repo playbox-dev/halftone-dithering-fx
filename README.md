@@ -1,6 +1,6 @@
 # mimono halftone
 
-A browser-based halftone / dithering effect generator reworked for mimono. The WebGL experience defaults to square marks inside a square frame; the original circle treatment remains available with `shape="circle"`.
+A browser-based halftone / dithering effect generator reworked for mimono. The WebGL experience defaults to square marks in the source image or video's original aspect ratio; a centered square crop and the original circle treatment remain available.
 
 No build step or package install — just static HTML/CSS/JS. The GIF encoder is pinned and
 vendored locally, so exports do not load code from a CDN.
@@ -20,12 +20,12 @@ Copy `webgl/halftone-fx.js` into your project and:
 <halftone-fx src="clip.mp4" grid="80" shape="square" threshold="50"
              mark-size="42" brightness="12"
              dot-color="#ff3110" background="transparent"
-             style="width:min(100%,720px);aspect-ratio:1"></halftone-fx>
+             style="width:min(100%,720px)"></halftone-fx>
 ```
 
-Why it's cheap: instead of reading pixels back to JS every frame, it runs two GPU passes — (1) the source is cover-cropped and downsampled to one texel per halftone cell (mipmap filtering computes the cell averages in hardware), (2) a fullscreen shader draws one anti-aliased mark per cell. No `getImageData`, no per-pixel JS loops, renders at `devicePixelRatio` so it stays sharp on retina/4K, and it auto-pauses when scrolled offscreen.
+Why it's cheap: instead of reading pixels back to JS every frame, it runs two GPU passes — (1) the source is downsampled to one texel per halftone cell (and cover-cropped only when the chosen frame ratio differs), (2) a fullscreen shader draws one anti-aliased mark per cell. No `getImageData`, no per-pixel JS loops, renders at `devicePixelRatio` so it stays sharp on retina/4K, and it auto-pauses when scrolled offscreen.
 
-Attributes (all reactive): `src`, `grid`, `shape` (`square` by default or legacy `circle`), `mark-size` (spacing), `threshold` (minimum mark size), `dot-color`, `background` (hex or `transparent`), `brightness`, `contrast`, `gamma`, `dither`, `multicolor`, `motion`, `amount`, `speed`, `phase`, `paused`. Motion modes are `pulse`, `radial`, `sweep`, `interference`, and `scan`; the deprecated `overdrive`, `flux`, and `seed` attributes remain accepted for old embeds. JS API: `el.play()`, `el.pause()`, `await el.whenReady()`, `el.renderNow()`, `await el.snapshot()`, `el.source = <img|video|canvas>`.
+Attributes (all reactive): `src`, `aspect` (`source` by default, `square`, or a ratio such as `16/9`), `grid`, `shape` (`square` by default or legacy `circle`), `mark-size` (spacing), `threshold` (minimum mark size), `dot-color`, `background` (hex or `transparent`), `brightness`, `contrast`, `gamma`, `dither`, `multicolor`, `motion`, `amount`, `speed`, `phase`, `paused`. Motion modes are `pulse`, `radial`, `sweep`, `interference`, and `scan`; the deprecated `overdrive`, `flux`, and `seed` attributes remain accepted for old embeds. JS API: `el.play()`, `el.pause()`, `await el.whenReady()`, `el.sourceDimensions`, `el.renderNow()`, `await el.snapshot()`, `el.source = <img|video|canvas>`.
 
 **Live demo:** <https://playbox-dev.github.io/halftone-dithering-fx/webgl/> — pick a source from `webgl/assets/` (the dropdown syncs with the repo), tune the look, then download PNG, MP4, or GIF, or export ready-to-paste iframe code. Full guide: [help page](https://playbox-dev.github.io/halftone-dithering-fx/webgl/help.html).
 
@@ -48,16 +48,16 @@ Error-diffusion algorithms (Floyd–Steinberg, JJN, Stucki, Burkes) are delibera
 `webgl/embed.html` is a full-viewport page configured entirely by URL params — no code editing needed:
 
 ```
-https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html?grid=80&size=42&threshold=50
+https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html?aspect=source&grid=80&size=42&threshold=50
 ```
 
-Params: `src` (media URL; add `type=video` for extension-less video URLs), `grid`, `shape`, `size`, `threshold`, `dot` / `bg` (hex, `#` optional), `brightness`, `contrast`, `gamma`, `dither`, `multicolor`, `motion`, `amount`, `speed`, `phase`. Point `src` at any CORS-accessible clip, or commit your clip under `webgl/assets/` in this repo — GitHub Pages serves it with the right headers.
+Params: `src` (media URL; add `type=video` for extension-less video URLs), `aspect`, `grid`, `shape`, `size`, `threshold`, `dot` / `bg` (hex, `#` optional), `brightness`, `contrast`, `gamma`, `dither`, `multicolor`, `motion`, `amount`, `speed`, `phase`. New exports set `aspect=source`; old embed URLs without it retain their square frame. Point `src` at any CORS-accessible clip, or commit your clip under `webgl/assets/` in this repo — GitHub Pages serves it with the right headers.
 
 **STUDIO (studio.design):** add an 埋め込みボックス (Embed box) and paste a standalone iframe — a lone `<iframe>` tag gets STUDIO's clean "iframe type" embed rather than the restricted sandbox:
 
 ```html
-<iframe src="https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html"
-        style="width:100%;aspect-ratio:1/1;display:block;border:0;pointer-events:none"
+<iframe src="https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html?src=./assets/horse.mp4&aspect=source"
+        style="width:100%;aspect-ratio:16/9;display:block;border:0;pointer-events:none"
         allow="autoplay" loading="lazy" title="mimono halftone visual"></iframe>
 ```
 
@@ -68,6 +68,7 @@ Params: `src` (media URL; add `type=video` for extension-less video URLs), `grid
 ## Features
 
 - Live preview for images **and** video (frame-by-frame)
+- Source aspect ratio by default, with an optional centered square crop
 - Seven process-based starting looks from Sparse to Blocks, plus a wide 1–320 px grid range
 - Optional symmetric motion fields: Pulse, Radial, Sweep, Interference, and Scan
 - Adjustable grid size, mark spacing, minimum-size threshold, brightness, contrast, gamma, and smoothing

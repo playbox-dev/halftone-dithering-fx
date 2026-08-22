@@ -222,7 +222,7 @@
       if (!source.width || !source.height) throw new Error('The preview is not ready to export yet.');
 
       const scale = Math.min(1, maxSize / Math.max(source.width, source.height));
-      const even = value => Math.max(2, Math.floor(value * scale / 2) * 2);
+      const even = value => Math.max(2, Math.round(value * scale / 2) * 2);
       const canvas = document.createElement('canvas');
       canvas.width = even(source.width);
       canvas.height = even(source.height);

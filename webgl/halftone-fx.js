@@ -10,6 +10,7 @@
  *
  * Attributes (all live-reactive):
  *   src          — image or video URL (video detected by extension, or force with type="video")
+ *   aspect       — source (default) | square | a ratio such as 16/9
  *   grid         — cell size in CSS px (default 80)
  *   shape        — square | circle (default square)
  *   threshold    — hide marks smaller than this percentage, 0..100 (default 50)
@@ -31,8 +32,8 @@
  *   overdrive / flux / seed — deprecated aliases retained for older embeds
  *   paused       — present = freeze rendering
  *
- * JS API: el.play(), el.pause(), el.whenReady(), el.renderNow(), el.snapshot(),
- *         el.source = <img|video|canvas element>
+ * JS API: el.play(), el.pause(), el.whenReady(), el.sourceDimensions,
+ *         el.renderNow(), el.snapshot(), el.source = <img|video|canvas element>
  *
  * How it works (2 GPU passes, no CPU pixel work):
  *   1. Downsample: source → tiny texture with one texel per halftone cell;
@@ -163,8 +164,11 @@
       markSize = clamp(markSize + field * mix(0.18, 0.52, uMotionAmount), 0.0, 1.0);
     } else if (uMotion > 0 && uMotionAmount > 0.0) {
       const float TAU = 6.28318530718;
-      vec2 uv = (vec2(cell) + 0.5) / vec2(uCellDims);
-      vec2 q = abs(uv * 2.0 - 1.0);
+      vec2 canvasSize = vec2(uCellDims) * uCellSize;
+      vec2 cellCenter = (vec2(cell) + 0.5) * uCellSize;
+      // Normalize both axes by the same physical distance so circular and
+      // square motion fields stay geometric on portrait and landscape frames.
+      vec2 q = abs(cellCenter - canvasSize * 0.5) / (min(canvasSize.x, canvasSize.y) * 0.5);
       float phase = uMotionPhase + uSeed * 0.017;
       float field = 0.0;
 
@@ -263,7 +267,7 @@
 
   class HalftoneFX extends HTMLElement {
     static get observedAttributes() {
-      return ['src', 'type', 'grid', 'shape', 'threshold', 'mark-size', 'dot-color', 'background', 'brightness',
+      return ['src', 'type', 'aspect', 'grid', 'shape', 'threshold', 'mark-size', 'dot-color', 'background', 'brightness',
               'contrast', 'gamma', 'dither', 'multicolor', 'motion', 'amount', 'speed', 'phase',
               'overdrive', 'flux', 'seed', 'paused'];
     }
@@ -272,7 +276,11 @@
       super();
       const root = this.attachShadow({ mode: 'open' });
       root.innerHTML = `<style>
-        :host { display: block; overflow: hidden; aspect-ratio: 1; }
+        :host {
+          display: block;
+          overflow: hidden;
+          aspect-ratio: var(--halftone-frame-aspect, var(--halftone-source-aspect, 1));
+        }
         canvas { display: block; width: 100%; height: 100%; }
       </style><canvas></canvas>`;
       this._canvas = root.querySelector('canvas');
@@ -292,6 +300,11 @@
       this._sourceReady = Promise.resolve();
       this._resolveSourceReady = null;
       this._sourceError = null;
+      this._sourceWidth = 0;
+      this._sourceHeight = 0;
+      this._assignedSourceCleanup = null;
+      this._sourceAssigned = false;
+      this._preferAssignedSource = false;
       this._motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
       this._reduceMotion = this._motionQuery.matches;
       this._onMotionChange = event => {
@@ -373,8 +386,16 @@
       });
       this._io.observe(this);
 
+      this._updateAspectRatio();
       this._resize();
-      if (this.hasAttribute('src')) this._loadSrc(this.getAttribute('src'));
+      if (this._preferAssignedSource) {
+        if (this._media) {
+          const assignedSource = this._media;
+          this.source = assignedSource;
+        }
+      } else if (this.hasAttribute('src')) {
+        this._loadSrc(this.getAttribute('src'));
+      }
     }
 
     disconnectedCallback() {
@@ -385,13 +406,36 @@
       if (this._ro) this._ro.disconnect();
       if (this._io) this._io.disconnect();
       this._motionQuery.removeEventListener('change', this._onMotionChange);
-      if (this._isVideo && this._media) this._media.pause();
+      if (this._assignedSourceCleanup) {
+        this._assignedSourceCleanup();
+        this._assignedSourceCleanup = null;
+      }
+      if (!this._sourceAssigned && this._isVideo && this._media) this._media.pause();
+      if (this._gl) {
+        this._gl.deleteTexture(this._srcTex);
+        this._gl.deleteTexture(this._cellTex);
+        this._gl.deleteFramebuffer(this._fbo);
+        this._gl.deleteProgram(this._progDown);
+        this._gl.deleteProgram(this._progMain);
+        this._srcTex = null;
+        this._cellTex = null;
+        this._fbo = null;
+        this._progDown = null;
+        this._progMain = null;
+        this._u = null;
+        this._gl = null;
+        this._cellW = 0;
+        this._cellH = 0;
+        this._srcDirty = true;
+      }
     }
 
     attributeChangedCallback(name, _old, value) {
+      if (name === 'src' && value) this._preferAssignedSource = false;
       if (!this._gl) return; // connectedCallback handles initial state
       if (name === 'src') this._loadSrc(value);
       else if (name === 'grid') this._resize();
+      else if (name === 'aspect') this._updateAspectRatio();
       else this._requestRender();
       if (name === 'phase') {
         const phase = parseFloat(value);
@@ -407,18 +451,118 @@
 
     /** Assign an existing <img>, <video>, or <canvas> as the source. */
     set source(el) {
+      const previousWasAssigned = this._sourceAssigned;
+      const previousMedia = this._media;
+      const previousWasVideo = this._isVideo;
+      this._assignedSourceCleanup?.();
+      this._assignedSourceCleanup = null;
+      if (!previousWasAssigned && previousWasVideo && previousMedia) previousMedia.pause();
+      this._sourceAssigned = true;
+      this._preferAssignedSource = true;
       this._resolveSourceReady?.();
-      this._loadGeneration += 1;
-      this._sourceReady = Promise.resolve();
+      const generation = ++this._loadGeneration;
       this._resolveSourceReady = null;
       this._sourceError = null;
       this._media = el;
       this._isVideo = el instanceof HTMLVideoElement;
       this._srcDirty = true;
-      this._requestRender();
-      this._syncLoop();
+
+      if (!el) {
+        this._sourceReady = Promise.resolve();
+        this._updateAspectRatio();
+        this._requestRender();
+        this._syncLoop();
+        return;
+      }
+
+      let settled = false;
+      const isReady = () => this._isVideo
+        ? el.readyState >= 2 && el.videoWidth > 0 && el.videoHeight > 0
+        : !(el instanceof HTMLImageElement) || (el.naturalWidth > 0 && el.naturalHeight > 0);
+      this._sourceReady = isReady()
+        ? Promise.resolve()
+        : new Promise(resolve => { this._resolveSourceReady = resolve; });
+
+      const update = (error = null, ready = true) => {
+        if (generation !== this._loadGeneration || this._media !== el) return;
+        this._sourceError = error;
+        this._srcDirty = !error;
+        this._updateAspectRatio();
+        if ((ready || error) && !settled) {
+          settled = true;
+          this._resolveSourceReady?.();
+          this._resolveSourceReady = null;
+        }
+        if (!ready && !error) {
+          this._requestRender();
+          return;
+        }
+        this.dispatchEvent(new CustomEvent(error ? 'source-error' : 'source-ready', {
+          detail: {
+            src: null,
+            error,
+            width: this._sourceWidth,
+            height: this._sourceHeight,
+            aspectRatio: this.sourceAspectRatio,
+          },
+        }));
+        this._requestRender();
+        this._syncLoop();
+      };
+      const onError = () => update(new Error('halftone-fx: assigned media failed to load'));
+
+      if (el instanceof HTMLVideoElement) {
+        const onMetadata = () => update(null, false);
+        const onReady = () => update();
+        const onResize = () => update(null, isReady());
+        const onPlayback = () => {
+          this._requestRender();
+          this._syncLoop();
+        };
+        el.addEventListener('loadedmetadata', onMetadata);
+        el.addEventListener('loadeddata', onReady);
+        el.addEventListener('resize', onResize);
+        el.addEventListener('play', onPlayback);
+        el.addEventListener('pause', onPlayback);
+        el.addEventListener('ended', onPlayback);
+        el.addEventListener('seeked', onPlayback);
+        el.addEventListener('error', onError);
+        this._assignedSourceCleanup = () => {
+          el.removeEventListener('loadedmetadata', onMetadata);
+          el.removeEventListener('loadeddata', onReady);
+          el.removeEventListener('resize', onResize);
+          el.removeEventListener('play', onPlayback);
+          el.removeEventListener('pause', onPlayback);
+          el.removeEventListener('ended', onPlayback);
+          el.removeEventListener('seeked', onPlayback);
+          el.removeEventListener('error', onError);
+        };
+      } else if (el instanceof HTMLImageElement && !isReady()) {
+        const onReady = () => update();
+        el.addEventListener('load', onReady, { once: true });
+        el.addEventListener('error', onError, { once: true });
+        this._assignedSourceCleanup = () => {
+          el.removeEventListener('load', onReady);
+          el.removeEventListener('error', onError);
+        };
+      }
+
+      if (isReady()) update();
     }
     get source() { return this._media; }
+    get sourceWidth() { return this._sourceWidth; }
+    get sourceHeight() { return this._sourceHeight; }
+    get sourceAspectRatio() {
+      return this._sourceWidth > 0 && this._sourceHeight > 0
+        ? this._sourceWidth / this._sourceHeight : 1;
+    }
+    get sourceDimensions() {
+      return {
+        width: this._sourceWidth,
+        height: this._sourceHeight,
+        aspectRatio: this.sourceAspectRatio,
+      };
+    }
 
     play() { this.removeAttribute('paused'); }
     pause() { this.setAttribute('paused', ''); }
@@ -455,6 +599,9 @@
       if (!this._gl || !this._media) {
         throw new Error('halftone-fx: no source is ready to render');
       }
+      // Aspect changes can land before ResizeObserver's next callback. Sync the
+      // backing canvas now so an immediate download has the visible frame ratio.
+      this._resize(false);
       this._render(performance.now() / 1000, advanceMotion);
       this._gl.flush();
       return this._canvas;
@@ -481,6 +628,20 @@
 
     _loadSrc(url) {
       if (!url) return;
+      const previousWasAssigned = this._sourceAssigned;
+      this._preferAssignedSource = false;
+      this._assignedSourceCleanup?.();
+      this._assignedSourceCleanup = null;
+      // A URL replaces a caller-owned source immediately, but never pauses it.
+      // Clearing the fallback keeps failed/in-flight loads from reclassifying
+      // external media as component-owned during a disconnect.
+      if (previousWasAssigned) {
+        this._media = null;
+        this._isVideo = false;
+        this._sourceAssigned = false;
+        this._srcDirty = true;
+        this._updateAspectRatio();
+      }
       this._resolveSourceReady?.();
       const generation = ++this._loadGeneration;
       this._sourceError = null;
@@ -491,12 +652,18 @@
         this._resolveSourceReady?.();
         this._resolveSourceReady = null;
         this.dispatchEvent(new CustomEvent(error ? 'source-error' : 'source-ready', {
-          detail: { src: url, error: error || null },
+          detail: {
+            src: url,
+            error: error || null,
+            width: this._sourceWidth,
+            height: this._sourceHeight,
+            aspectRatio: this.sourceAspectRatio,
+          },
         }));
         return true;
       };
       const isVideo = this.getAttribute('type') === 'video' || VIDEO_RE.test(url);
-      if (this._isVideo && this._media) this._media.pause();
+      if (!previousWasAssigned && this._isVideo && this._media) this._media.pause();
       if (isVideo) {
         const v = document.createElement('video');
         v.crossOrigin = 'anonymous';
@@ -505,14 +672,24 @@
         v.playsInline = true;
         v.autoplay = true;
         v.src = url;
+        const syncPlayback = () => {
+          if (generation !== this._loadGeneration || !this.isConnected) return;
+          this._requestRender();
+          this._syncLoop();
+        };
+        v.addEventListener('play', syncPlayback);
+        v.addEventListener('pause', syncPlayback);
+        v.addEventListener('ended', syncPlayback);
+        v.addEventListener('seeked', syncPlayback);
         v.addEventListener('loadeddata', () => {
-          if (generation !== this._loadGeneration) {
+          if (generation !== this._loadGeneration || !this.isConnected) {
             v.pause();
             return;
           }
           this._media = v;
           this._isVideo = true;
           this._srcDirty = true;
+          this._updateAspectRatio();
           v.play().catch(() => {});
           settle();
           this._requestRender();
@@ -526,10 +703,11 @@
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.addEventListener('load', () => {
-          if (generation !== this._loadGeneration) return;
+          if (generation !== this._loadGeneration || !this.isConnected) return;
           this._media = img;
           this._isVideo = false;
           this._srcDirty = true;
+          this._updateAspectRatio();
           settle();
           this._requestRender();
           this._syncLoop();
@@ -542,13 +720,39 @@
       }
     }
 
+    _updateAspectRatio() {
+      const media = this._media;
+      const width = media?.videoWidth || media?.naturalWidth || media?.width || 0;
+      const height = media?.videoHeight || media?.naturalHeight || media?.height || 0;
+      this._sourceWidth = Number.isFinite(width) && width > 0 ? width : 0;
+      this._sourceHeight = Number.isFinite(height) && height > 0 ? height : 0;
+      if (this._sourceWidth && this._sourceHeight) {
+        this.style.setProperty('--halftone-source-aspect', `${this._sourceWidth} / ${this._sourceHeight}`);
+      } else {
+        this.style.removeProperty('--halftone-source-aspect');
+      }
+
+      const raw = (this.getAttribute('aspect') || 'source').trim().toLowerCase();
+      let forced = '';
+      if (raw === 'square' || raw === '1:1') {
+        forced = '1 / 1';
+      } else if (!['', 'source', 'auto', 'original'].includes(raw)) {
+        const parts = raw.split(/[/:]/).map(Number);
+        const ratio = parts.length === 2 && parts[0] > 0 && parts[1] > 0
+          ? parts[0] / parts[1] : Number(raw);
+        if (Number.isFinite(ratio) && ratio > 0) forced = String(ratio);
+      }
+      if (forced) this.style.setProperty('--halftone-frame-aspect', forced);
+      else this.style.removeProperty('--halftone-frame-aspect');
+    }
+
     _gridPx() {
       const dpr = window.devicePixelRatio || 1;
       const g = parseFloat(this.getAttribute('grid')) || 80;
       return Math.max(1, g) * dpr;
     }
 
-    _resize() {
+    _resize(requestRender = true) {
       const gl = this._gl;
       if (!gl) return;
       const dpr = window.devicePixelRatio || 1;
@@ -568,7 +772,7 @@
         gl.bindTexture(gl.TEXTURE_2D, this._cellTex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, cw, ch, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
       }
-      this._requestRender();
+      if (requestRender) this._requestRender();
     }
 
     _motionSettings() {
@@ -593,11 +797,12 @@
     }
 
     _animating() {
-      if (this._captureCount || this.hasAttribute('paused') || !this._visible || !this._media) return false;
+      if (!this.isConnected || this._captureCount || this.hasAttribute('paused') || !this._visible || !this._media) return false;
       const motion = this._motionSettings();
       const movingField = motion.code > 0 && motion.amount > 0 && motion.speed > 0 && !this._reduceMotion;
       const animatedNoise = this.getAttribute('dither') === 'noise' && !this._reduceMotion;
-      return this._isVideo || animatedNoise || movingField;
+      const playingVideo = this._isVideo && !this._media.paused && !this._media.ended;
+      return playingVideo || animatedNoise || movingField;
     }
 
     _syncLoop() {
@@ -621,7 +826,7 @@
 
     _requestRender() {
       // One-shot render for static states (loop handles animated ones).
-      if (this._captureCount || this._raf || this._onceRaf || !this._gl || !this._media) return;
+      if (!this.isConnected || this._captureCount || this._raf || this._onceRaf || !this._gl || !this._media) return;
       this._onceRaf = requestAnimationFrame(t => {
         this._onceRaf = 0;
         if (!this._raf) this._render(t / 1000);
