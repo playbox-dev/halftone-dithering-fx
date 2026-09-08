@@ -1,6 +1,32 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {createPlaybackController} from './playbox-hero.mjs';
+import {createPlaybackController, mountHero} from './playbox-hero.mjs';
+
+test('mounts without a playback button and respects reduced motion',async() => {
+  const poster = {decode:async() => {}};
+  const document = {
+    getElementById:id => id === 'poster' ? poster : null,
+    documentElement:{dataset:{}},
+    hidden:false,
+    addEventListener() {},
+  };
+  const window = {
+    navigator:{},
+    matchMedia:() => ({matches:true,addEventListener() {}}),
+    addEventListener() {},
+    requestAnimationFrame:callback => callback(),
+    requestIdleCallback:callback => callback(),
+    IntersectionObserver:class {
+      constructor(callback) {this.callback = callback;}
+      observe() {this.callback([{isIntersecting:true}]);}
+    },
+  };
+  const controller = await mountHero(document,window);
+  assert.deepEqual(controller.getState(),{
+    wanted:false,visible:true,pageVisible:true,ready:true,
+  });
+  assert.equal(document.documentElement.dataset.animationReady,undefined);
+});
 
 function fixture(options = {}) {
   const calls = {loads:0,plays:0,pauses:0};

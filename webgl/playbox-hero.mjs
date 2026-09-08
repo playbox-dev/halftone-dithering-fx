@@ -43,12 +43,10 @@ export function createPlaybackController({load, onChange = () => {}, onError = (
 
 export async function mountHero(document, window) {
   const poster = document.getElementById('poster');
-  const button = document.getElementById('playback');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const saveData = Boolean(window.navigator.connection?.saveData);
   let fx;
   let video;
-  let failed = false;
 
   async function loadMedia() {
     await import('./halftone-fx.js?v=15');
@@ -58,7 +56,7 @@ export async function mountHero(document, window) {
       brightness:'100',contrast:'45',gamma:'3',dither:'bayer4',paused:''};
     for (const [name,value] of Object.entries(attributes)) fx.setAttribute(name,value);
     fx.setAttribute('aria-hidden','true');
-    if (!fx.isConnected) document.body.insertBefore(fx,button);
+    if (!fx.isConnected) document.body.append(fx);
     // If WebGL is unavailable, the HTML poster remains the complete visual.
     if (!fx.shadowRoot?.querySelector('canvas')) throw new Error('WebGL unavailable');
     video ||= document.createElement('video');
@@ -97,20 +95,9 @@ export async function mountHero(document, window) {
   const controller = createPlaybackController({
     load:loadMedia,
     wanted:!reduceMotion.matches && !saveData,
-    onChange(state) {
-      button.textContent = state.wanted ? '一時停止' : failed ? '再試行' : '再生';
-      button.setAttribute('aria-label',state.wanted ? 'ビジュアルアニメーションを一時停止' : 'ビジュアルアニメーションを再生');
-    },
     onError() {
-      failed = true;
       delete document.documentElement.dataset.animationReady;
-      button.textContent = '再試行';
     },
-  });
-  button.hidden = false;
-  button.addEventListener('click',() => {
-    failed = false;
-    controller.update({wanted:!controller.getState().wanted});
   });
   reduceMotion.addEventListener('change',event => {
     if (!event.matches) return;
