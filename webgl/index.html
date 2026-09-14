@@ -240,6 +240,11 @@
       <label for="multicolor">Multicolor marks</label>
     </div>
 
+    <div class="row-check">
+      <input type="checkbox" id="invert">
+      <label for="invert">Invert (marks on light areas, dark areas empty)</label>
+    </div>
+
     <label for="motion">Motion</label>
     <select id="motion">
       <option value="off" selected>Off</option>
@@ -339,6 +344,12 @@
     document.getElementById('multicolor').addEventListener('change', e => {
       e.target.checked ? fx.setAttribute('multicolor', '') : fx.removeAttribute('multicolor');
       if (!applyingPreset) presetSelect.value = 'custom';
+    });
+
+    // Invert swaps which side of the source reads as foreground. Like Motion it
+    // is independent of the Look presets, so toggling it never resets them.
+    document.getElementById('invert').addEventListener('change', e => {
+      e.target.checked ? fx.setAttribute('invert', '') : fx.removeAttribute('invert');
     });
 
     motionInput.addEventListener('change', () => setMotion(motionInput.value));
@@ -529,6 +540,7 @@
         if (v !== EMBED_DEFAULTS[k]) p.set(k, v);
       }
       if (document.getElementById('multicolor').checked) p.set('multicolor', '');
+      if (document.getElementById('invert').checked) p.set('invert', '');
       if (motionInput.value !== 'off') {
         p.set('motion', motionInput.value);
         p.set('amount', amountInput.value);

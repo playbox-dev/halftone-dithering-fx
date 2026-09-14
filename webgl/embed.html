@@ -37,6 +37,7 @@
     }
     if (p.has('multicolor')) fx.setAttribute('multicolor', '');
     const isEnabled = value => !['0', 'false', 'off', 'no'].includes((value || '').toLowerCase());
+    if (p.has('invert') && isEnabled(p.get('invert'))) fx.setAttribute('invert', '');
     if (!p.has('motion') && p.has('overdrive') && isEnabled(p.get('overdrive'))) {
       fx.setAttribute('overdrive', '');
     }
