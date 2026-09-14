@@ -25,6 +25,8 @@
  *                  grain: interleaved gradient noise — blue-noise-like, stable, organic
  *                  noise: white noise re-seeded ~30fps — deliberate film-grain flicker
  *   multicolor   — present = rainbow marks by brightness
+ *   invert       — present = flip source tones so marks fall on light areas and
+ *                  dark areas stay empty (swaps which side reads as foreground)
  *   motion       — off | pulse | radial | sweep | interference | scan (default off)
  *   amount       — motion depth, 0..100 (default 35)
  *   speed        — motion rate, 0..100; 0 freezes the field (default 35)
@@ -58,6 +60,7 @@
   precision highp float;
   uniform sampler2D uSrc;
   uniform float uBrightness, uContrast, uGamma;
+  uniform int uInvert;        // 0/1
   uniform float uSrcAspect, uDstAspect;
   in vec2 vUv;
   out vec4 o;
@@ -71,6 +74,9 @@
     }
     vec3 c = texture(uSrc, uv).rgb;
     float g = dot(c, vec3(0.299, 0.587, 0.114));
+    // Invert before tone controls so brightness/contrast/gamma keep shaping the
+    // rendered output the same way whichever side is treated as foreground.
+    if (uInvert == 1) g = 1.0 - g;
     g = uContrast * (g - 0.5) + 0.5 + uBrightness;
     g = clamp(g, 0.0, 1.0);
     g = pow(g, 1.0 / uGamma);
@@ -268,7 +274,7 @@
   class HalftoneFX extends HTMLElement {
     static get observedAttributes() {
       return ['src', 'type', 'aspect', 'grid', 'shape', 'threshold', 'mark-size', 'dot-color', 'background', 'brightness',
-              'contrast', 'gamma', 'dither', 'multicolor', 'motion', 'amount', 'speed', 'phase',
+              'contrast', 'gamma', 'dither', 'multicolor', 'invert', 'motion', 'amount', 'speed', 'phase',
               'overdrive', 'flux', 'seed', 'paused'];
     }
 
@@ -339,6 +345,7 @@
           brightness: gl.getUniformLocation(this._progDown, 'uBrightness'),
           contrast: gl.getUniformLocation(this._progDown, 'uContrast'),
           gamma: gl.getUniformLocation(this._progDown, 'uGamma'),
+          invert: gl.getUniformLocation(this._progDown, 'uInvert'),
           srcAspect: gl.getUniformLocation(this._progDown, 'uSrcAspect'),
           dstAspect: gl.getUniformLocation(this._progDown, 'uDstAspect'),
         },
@@ -897,6 +904,7 @@
         ? Math.min(3, Math.max(0.1, baseGamma + legacySignal(2) * (0.12 + motion.amount * 0.42)))
         : baseGamma;
       gl.uniform1f(this._u.down.gamma, effectiveGamma);
+      gl.uniform1i(this._u.down.invert, this.hasAttribute('invert') ? 1 : 0);
       const srcW = media.videoWidth || media.naturalWidth || media.width || 1;
       const srcH = media.videoHeight || media.naturalHeight || media.height || 1;
       gl.uniform1f(this._u.down.srcAspect, srcW / srcH);

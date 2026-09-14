@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <script src="./halftone-fx.js?v=15"></script>
+  <script src="./halftone-fx.js?v=16"></script>
   <script>
     // Configure entirely via query params, e.g.:
     //   embed.html?grid=80&shape=square&size=42&threshold=50&dot=ff3110&bg=transparent
@@ -43,6 +43,7 @@
     if (requestedAspect !== null) document.documentElement.dataset.framed = '';
     if (p.has('multicolor')) fx.setAttribute('multicolor', '');
     const isEnabled = value => !['0', 'false', 'off', 'no'].includes((value || '').toLowerCase());
+    if (p.has('invert') && isEnabled(p.get('invert'))) fx.setAttribute('invert', '');
     if (!p.has('motion') && p.has('overdrive') && isEnabled(p.get('overdrive'))) {
       fx.setAttribute('overdrive', '');
     }
