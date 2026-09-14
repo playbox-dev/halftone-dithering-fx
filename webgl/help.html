@@ -89,8 +89,8 @@
     <li>Select the box, open the settings panel on the right, and paste the code from
         <strong>Export iframe</strong> into the <strong>埋め込みコード</strong> (embed code) field.</li>
     <li>Size and position the box like any element — for a hero background, make it fill
-        the section and layer your text boxes on top. Keep its width and height equal for
-        the default 1:1 composition.</li>
+        the section and layer your text boxes on top. The exported code carries the
+        source's own aspect ratio, so the box keeps the image or clip's shape.</li>
     <li>The editor canvas may show a placeholder instead of the animation — that's normal.
         Check <strong>プレビュー</strong> (preview), then <strong>公開</strong> (publish).</li>
   </ol>
@@ -103,8 +103,8 @@
     <strong>Backgrounds:</strong> the exported code includes <code>pointer-events:none</code>
     so clicks and scrolling pass through to your page. Remove it if the animation should be
     interactive. Set the <code>bg</code> param to your page's background color so the
-     iframe edges are invisible. The exported iframe includes <code>aspect-ratio:1/1</code>
-     so the default box stays square.
+     iframe edges are invisible. The exported iframe includes an <code>aspect-ratio</code>
+     matching the source (e.g. <code>16/9</code> for a widescreen clip) so nothing is cropped.
   </div>
 
   <h2 id="params">URL parameters</h2>

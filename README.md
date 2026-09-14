@@ -1,6 +1,6 @@
 # mimono halftone
 
-A browser-based halftone / dithering effect generator reworked for mimono. The WebGL experience defaults to square marks inside a square frame; the original circle treatment remains available with `shape="circle"`.
+A browser-based halftone / dithering effect generator reworked for mimono. The WebGL experience defaults to square marks and sizes its output to the source's own aspect ratio; the original circle treatment remains available with `shape="circle"`.
 
 No build step, no dependencies — just static HTML/CSS/JS.
 
@@ -19,8 +19,10 @@ Copy `webgl/halftone-fx.js` into your project and:
 <halftone-fx src="clip.mp4" grid="80" shape="square" threshold="50"
              mark-size="42" brightness="12"
              dot-color="#ff3110" background="transparent"
-             style="width:min(100%,720px);aspect-ratio:1"></halftone-fx>
+             style="width:min(100%,720px)"></halftone-fx>
 ```
+
+The element takes the source's own aspect ratio once it loads, so the output is shaped like the image or clip. Set your own `aspect-ratio` or an explicit height to force a different frame; the source is then cover-cropped rather than stretched.
 
 Why it's cheap: instead of reading pixels back to JS every frame, it runs two GPU passes — (1) the source is cover-cropped and downsampled to one texel per halftone cell (mipmap filtering computes the cell averages in hardware), (2) a fullscreen shader draws one anti-aliased mark per cell. No `getImageData`, no per-pixel JS loops, renders at `devicePixelRatio` so it stays sharp on retina/4K, and it auto-pauses when scrolled offscreen.
 
@@ -56,7 +58,7 @@ Params: `src` (media URL; add `type=video` for extension-less video URLs), `grid
 
 ```html
 <iframe src="https://playbox-dev.github.io/halftone-dithering-fx/webgl/embed.html"
-        style="width:100%;aspect-ratio:1/1;display:block;border:0;pointer-events:none"
+        style="width:100%;aspect-ratio:16/9;display:block;border:0;pointer-events:none"
         allow="autoplay" loading="lazy" title="mimono halftone visual"></iframe>
 ```
 

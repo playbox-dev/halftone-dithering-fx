@@ -33,7 +33,13 @@
  *   overdrive / flux / seed — deprecated aliases retained for older embeds
  *   paused       — present = freeze rendering
  *
- * JS API: el.play(), el.pause(), el.snapshot(), el.source = <img|video|canvas element>
+ * JS API: el.play(), el.pause(), el.snapshot(), el.source = <img|video|canvas element>,
+ *         el.sourceSize → { width, height, aspect }; fires "sourceload" when media is ready.
+ *
+ * Sizing: the element takes the source's own aspect ratio (via the
+ * --halftone-aspect custom property it sets on itself) so output is shaped
+ * like the image or clip. Give it your own aspect-ratio or an explicit height
+ * to force a different frame; the source is then cover-cropped, never stretched.
  *
  * How it works (2 GPU passes, no CPU pixel work):
  *   1. Downsample: source → tiny texture with one texel per halftone cell;
@@ -277,7 +283,10 @@
       super();
       const root = this.attachShadow({ mode: 'open' });
       root.innerHTML = `<style>
-        :host { display: block; overflow: hidden; aspect-ratio: 1; }
+        /* Follows the source's own aspect ratio once it loads; a 1:1 placeholder
+           holds the space before that. Authors can override with their own
+           aspect-ratio or an explicit height. */
+        :host { display: block; overflow: hidden; aspect-ratio: var(--halftone-aspect, 1); }
         canvas { display: block; width: 100%; height: 100%; }
       </style><canvas></canvas>`;
       this._canvas = root.querySelector('canvas');
@@ -411,10 +420,21 @@
       this._media = el;
       this._isVideo = el instanceof HTMLVideoElement;
       this._srcDirty = true;
+      this._applySourceAspect();
       this._requestRender();
       this._syncLoop();
     }
     get source() { return this._media; }
+
+    /** Natural size of the current source: { width, height, aspect } or null. */
+    get sourceSize() {
+      const m = this._media;
+      if (!m) return null;
+      const width = m.videoWidth || m.naturalWidth || m.width || 0;
+      const height = m.videoHeight || m.naturalHeight || m.height || 0;
+      if (!width || !height) return null;
+      return { width, height, aspect: width / height };
+    }
 
     play() { this.removeAttribute('paused'); }
     pause() { this.setAttribute('paused', ''); }
@@ -438,6 +458,15 @@
 
     // --- internals -----------------------------------------------------
 
+    // Size the element like the media itself, so an image renders at the
+    // image's shape and a 16:9 clip stays 16:9 instead of being cropped square.
+    _applySourceAspect() {
+      const size = this.sourceSize;
+      if (!size) return;
+      this.style.setProperty('--halftone-aspect', String(size.aspect));
+      this.dispatchEvent(new CustomEvent('sourceload', { detail: size }));
+    }
+
     _loadSrc(url) {
       if (!url) return;
       const isVideo = this.getAttribute('type') === 'video' || VIDEO_RE.test(url);
@@ -454,6 +483,7 @@
           this._media = v;
           this._isVideo = true;
           this._srcDirty = true;
+          this._applySourceAspect();
           v.play().catch(() => {});
           this._requestRender();
           this._syncLoop();
@@ -466,6 +496,7 @@
           this._media = img;
           this._isVideo = false;
           this._srcDirty = true;
+          this._applySourceAspect();
           this._requestRender();
           this._syncLoop();
         });
